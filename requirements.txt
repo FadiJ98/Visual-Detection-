@@ -1,0 +1,7 @@
+opencv-python
+mediapipe
+deepface
+numpy
+onnxruntime ; platform_machine != "armv7l"
+onnxruntime-gpu ; sys_platform == "linux" and platform_machine == "x86_64"
+streamlit
