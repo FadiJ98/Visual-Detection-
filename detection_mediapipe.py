@@ -6,11 +6,15 @@ from typing import List, Tuple, Union, Optional
 NDArray = np.ndarray
 BBox = Tuple[int, int, int, int]  # (x1, y1, x2, y2)
 
-def _clamp(v, lo, hi):
+
+def _clamp(v: int, lo: int, hi: int) -> int:
     return max(lo, min(hi, v))
 
+
 def _ensure_bgr(img: NDArray) -> NDArray:
-    # Convert various shapes to BGR safely
+    """
+    Make sure the image is BGR (3 channels).
+    """
     if img is None or img.size == 0:
         return img
     if img.ndim == 2:
@@ -19,7 +23,11 @@ def _ensure_bgr(img: NDArray) -> NDArray:
         return cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
     return img  # assume already BGR
 
+
 def _to_bgr(image_source: Union[str, NDArray]) -> NDArray:
+    """
+    Accept a file path or ndarray and return a BGR ndarray.
+    """
     if isinstance(image_source, str):
         img = cv2.imread(image_source, cv2.IMREAD_UNCHANGED)
         if img is None:
@@ -29,36 +37,39 @@ def _to_bgr(image_source: Union[str, NDArray]) -> NDArray:
         raise TypeError("image_source must be a file path (str) or a numpy array.")
     return _ensure_bgr(image_source)
 
+
 class FaceDetectorMP:
     """
-    MediaPipe face detector with image-friendly helpers.
+    MediaPipe face detector with helpers for images.
     """
+
     def __init__(self, min_conf: float = 0.5, model_selection: int = 0, pad: float = 0.08):
         self.detector = mp.solutions.face_detection.FaceDetection(
             model_selection=model_selection,
-            min_detection_confidence=min_conf
+            min_detection_confidence=min_conf,
         )
         self.pad = float(pad)
 
     def close(self):
-        # Optional cleanup for long-running apps
-        if hasattr(self.detector, 'close'):
+        if hasattr(self.detector, "close"):
             self.detector.close()
 
     def detect(self, bgr_img: NDArray) -> List[BBox]:
         """
-        Detect faces on a BGR image and return list of (x1,y1,x2,y2) boxes.
+        Detect faces on a BGR image and return list of (x1, y1, x2, y2).
         """
         if bgr_img is None or bgr_img.size == 0:
             return []
+
+        bgr_img = _ensure_bgr(bgr_img)
         rgb = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB)
         res = self.detector.process(rgb)
+
         boxes: List[BBox] = []
         if res.detections:
             h, w = bgr_img.shape[:2]
             for d in res.detections:
                 bb = d.location_data.relative_bounding_box
-                # pad in *relative* coords
                 px = self.pad
                 x1 = _clamp(int((bb.xmin - px) * w), 0, w - 1)
                 y1 = _clamp(int((bb.ymin - px) * h), 0, h - 1)
@@ -74,8 +85,11 @@ class FaceDetectorMP:
         """
         if bgr_img is None or bgr_img.size == 0:
             return []
+
+        bgr_img = _ensure_bgr(bgr_img)
         rgb = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB)
         res = self.detector.process(rgb)
+
         out: List[Tuple[BBox, float]] = []
         if res.detections:
             h, w = bgr_img.shape[:2]
@@ -108,7 +122,12 @@ class FaceDetectorMP:
         return self.detect(bgr)
 
     @staticmethod
-    def draw_boxes(bgr_img: NDArray, boxes: List[BBox], color=(0, 255, 255), thickness: int = 2) -> NDArray:
+    def draw_boxes(
+        bgr_img: NDArray,
+        boxes: List[BBox],
+        color=(0, 255, 0),
+        thickness: int = 2,
+    ) -> NDArray:
         out = bgr_img.copy()
         for (x1, y1, x2, y2) in boxes:
             cv2.rectangle(out, (x1, y1), (x2, y2), color, thickness)

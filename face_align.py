@@ -4,9 +4,20 @@ from typing import Tuple, Optional
 
 BBox = Tuple[int, int, int, int]  # (x1, y1, x2, y2)
 
-def crop_face(img_bgr: np.ndarray, box: BBox, size: int = 160, pad: float = 0.25) -> Optional[np.ndarray]:
+
+def crop_face(
+    img_bgr: np.ndarray,
+    box: BBox,
+    size: int = 160,
+    pad: float = 0.25
+) -> Optional[np.ndarray]:
+    """
+    Take a BGR image and a face bounding box, return a square
+    cropped + resized face (BGR) or None if something is wrong.
+    """
     if img_bgr is None or img_bgr.size == 0 or box is None:
         return None
+
     x1, y1, x2, y2 = map(int, box)
     h, w = img_bgr.shape[:2]
 
@@ -18,7 +29,7 @@ def crop_face(img_bgr: np.ndarray, box: BBox, size: int = 160, pad: float = 0.25
     # Center + padded square crop
     cx = x1 + face_w // 2
     cy = y1 + face_h // 2
-    side = int(max(face_w, face_h) * (1 + pad))
+    side = int(max(face_w, face_h) * (1.0 + pad))
 
     x1n = max(cx - side // 2, 0)
     y1n = max(cy - side // 2, 0)
