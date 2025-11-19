@@ -5,82 +5,108 @@ from tkinter import Tk, Canvas, filedialog, messagebox
 from tkinter import ttk
 from PIL import Image, ImageTk
 
-from detection_mediapipe import FaceDetectorMP  # <- MediaPipe detector
+from detection_mediapipe import FaceDetectorMP
 
 
 class VisualDetectionApp:
     def __init__(self, root: Tk):
         self.root = root
-        self.root.title("Basic Visual Detection (Tkinter + MediaPipe)")
-        self.root.geometry("900x650")
-        self.root.minsize(700, 500)
+        self.root.title("Visual Detection — Face Recognition Demo")
+        self.root.geometry("1000x700")
+        self.root.config(bg="#1e1e1e")
+        self.root.minsize(800, 600)
 
         # State
-        self.cv_bgr: np.ndarray | None = None       # original image (BGR)
-        self.cv_annotated: np.ndarray | None = None # annotated image (BGR)
-        self.tk_img: ImageTk.PhotoImage | None = None
+        self.cv_bgr = None
+        self.cv_annotated = None
+        self.tk_img = None
         self.current_path: Path | None = None
 
-        # MediaPipe face detector (good for near + far faces)
+        # MediaPipe face detector
         self.face_detector = FaceDetectorMP(
-            min_conf=0.6,       # adjust if needed
-            model_selection=1,  # 1 = better for further-away faces
+            min_conf=0.6,
+            model_selection=1,
             pad=0.08,
         )
 
-        # --- UI: controls at top ---
-        top = ttk.Frame(root, padding=8)
-        top.pack(side="top", fill="x")
+        # --- HEADER BAR ---
+        header = ttk.Frame(self.root, padding=12)
+        header.pack(side="top", fill="x")
 
-        ttk.Button(top, text="Open Image", command=self.open_image).pack(side="left")
+        title_label = ttk.Label(
+            header,
+            text="Visual Detection — MediaPipe Face Detection",
+            font=("Segoe UI", 16, "bold")
+        )
+        title_label.pack(side="left")
+
+        # --- TOOLBAR ---
+        toolbar = ttk.Frame(self.root, padding=10)
+        toolbar.pack(side="top", fill="x")
+
+        self.open_btn = ttk.Button(toolbar, text="Open Image", command=self.open_image)
+        self.open_btn.pack(side="left", padx=5)
+
         self.detect_btn = ttk.Button(
-            top, text="Detect Faces", command=self.detect_faces, state="disabled"
+            toolbar, text="Detect Faces", command=self.detect_faces, state="disabled"
         )
-        self.detect_btn.pack(side="left", padx=6)
-        self.save_btn = ttk.Button(
-            top, text="Save Annotated", command=self.save_annotated, state="disabled"
-        )
-        self.save_btn.pack(side="left", padx=6)
+        self.detect_btn.pack(side="left", padx=5)
 
-        self.status = ttk.Label(top, text="Load an image to begin.")
+        self.save_btn = ttk.Button(
+            toolbar, text="Save Annotated", command=self.save_annotated, state="disabled"
+        )
+        self.save_btn.pack(side="left", padx=5)
+
+        self.status = ttk.Label(toolbar, text="Load an image to begin.")
         self.status.pack(side="right")
 
-        # UI: canvas for image
-        self.canvas = Canvas(root, bg="#111", highlightthickness=0)
-        self.canvas.pack(fill="both", expand=True, padx=8, pady=8)
+        # --- CANVAS AREA ---
+        self.canvas_frame = ttk.Frame(self.root, padding=10)
+        self.canvas_frame.pack(fill="both", expand=True)
 
-        # Resize handler to redraw when window size changes
+        self.canvas = Canvas(
+            self.canvas_frame, bg="#0f0f0f", highlightthickness=0
+        )
+        self.canvas.pack(fill="both", expand=True)
+
+        # Redraw image when window resizes
         self.root.bind("<Configure>", lambda e: self._redraw())
 
-    # ---------- File ops ----------
+        # Modern theme
+        try:
+            ttk.Style().theme_use("clam")
+        except:
+            pass
 
-    def open_image(self) -> None:
+    # ---------- File Operations ----------
+    def open_image(self):
         path = filedialog.askopenfilename(
             title="Select an image",
-            filetypes=[
-                ("Image files", "*.jpg *.jpeg *.png *.bmp *.webp"),
-                ("All files", "*.*"),
-            ],
+            filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp *.webp"),
+                       ("All files", "*.*")]
         )
         if not path:
             return
 
         self.current_path = Path(path)
         img = cv2.imread(path)
+
         if img is None:
-            messagebox.showerror("Error", "Could not open image.")
+            messagebox.showerror("Error", "Could not load image.")
             return
 
         self.cv_bgr = img
         self.cv_annotated = None
+
         self.detect_btn.config(state="normal")
         self.save_btn.config(state="disabled")
+
         self.status.config(
             text=f"Loaded: {self.current_path.name} — {img.shape[1]}x{img.shape[0]}"
         )
         self._redraw()
 
-    def save_annotated(self) -> None:
+    def save_annotated(self):
         if self.cv_annotated is None:
             messagebox.showinfo("Info", "Run detection first.")
             return
@@ -89,11 +115,15 @@ class VisualDetectionApp:
             defaultextension=".png",
             initialfile=(
                 self.current_path.stem + "_annotated.png"
-                if self.current_path
-                else "annotated.png"
+                if self.current_path else "annotated.png"
             ),
-            filetypes=[("PNG", "*.png"), ("JPEG", "*.jpg *.jpeg"), ("All files", "*.*")],
+            filetypes=[
+                ("PNG files", "*.png"),
+                ("JPEG files", "*.jpg *.jpeg"),
+                ("All files", "*.*")
+            ]
         )
+
         if not out_path:
             return
 
@@ -101,12 +131,10 @@ class VisualDetectionApp:
         self.status.config(text=f"Saved: {Path(out_path).name}")
 
     # ---------- Detection ----------
-
-    def detect_faces(self) -> None:
+    def detect_faces(self):
         if self.cv_bgr is None:
             return
 
-        # MediaPipe detection
         boxes = self.face_detector.detect(self.cv_bgr)
 
         annotated = self.cv_bgr.copy()
@@ -116,35 +144,34 @@ class VisualDetectionApp:
         self.cv_annotated = annotated
         self.save_btn.config(state="normal")
         self.status.config(text=f"Faces detected: {len(boxes)}")
+
         self._redraw(annotated=True)
 
     # ---------- Drawing ----------
-
-    def _redraw(self, annotated: bool = False) -> None:
+    def _redraw(self, annotated=False):
         self.canvas.delete("all")
 
-        img = None
+        # Which image to show?
         if annotated and self.cv_annotated is not None:
             img = self.cv_annotated
-        elif self.cv_bgr is not None:
+        else:
             img = self.cv_bgr
 
         if img is None:
-            w = self.canvas.winfo_width()
-            h = self.canvas.winfo_height()
             self.canvas.create_text(
-                w // 2,
-                h // 2,
-                text="Open an image to view it here",
-                fill="#bbb",
-                font=("Arial", 14),
+                self.canvas.winfo_width() // 2,
+                self.canvas.winfo_height() // 2,
+                text="Open an image to display",
+                fill="#bbbbbb",
+                font=("Segoe UI", 14),
             )
             return
 
-        cw, ch = max(1, self.canvas.winfo_width()), max(1, self.canvas.winfo_height())
+        # Scale image to fit inside canvas
+        cw, ch = self.canvas.winfo_width(), self.canvas.winfo_height()
         ih, iw = img.shape[:2]
         scale = min(cw / iw, ch / ih)
-        new_w, new_h = max(1, int(iw * scale)), max(1, int(ih * scale))
+        new_w, new_h = int(iw * scale), int(ih * scale)
 
         rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         pil_img = Image.fromarray(rgb).resize((new_w, new_h), Image.LANCZOS)
@@ -155,15 +182,12 @@ class VisualDetectionApp:
         self.canvas.create_image(x, y, anchor="nw", image=self.tk_img)
 
 
-def main() -> None:
+def main():
     root = Tk()
-    try:
-        ttk.Style().theme_use("clam")
-    except Exception:
-        pass
-    app = VisualDetectionApp(root)
+    VisualDetectionApp(root)
     root.mainloop()
 
 
 if __name__ == "__main__":
     main()
+
