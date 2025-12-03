@@ -13,7 +13,7 @@ from recognition_deepface import RecognizerDeepFace
 # ---------- STREAMLIT PAGE CONFIG ----------
 st.set_page_config(page_title="Visual Detection (DeepFace)", layout="wide")
 
-# ---------- GLOBAL CSS (animations, dots, etc.) ----------
+# ---------- GLOBAL CSS (animations, dots, loader overlay) ----------
 st.markdown(
     """
     <style>
@@ -38,6 +38,26 @@ st.markdown(
     .typing-dots::after {
         content: '';
         animation: dotsBlink 1.2s steps(4, end) infinite;
+    }
+
+    /* Full-screen loader overlay */
+    .loader-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .loader-inner {
+        text-align: center;
+        animation: fadeUp 0.6s ease-out forwards;
+    }
+    .loader-inner p {
+        margin-top: 16px;
+        color: #eeeeee;
+        font-size: 18px;
     }
     </style>
     """,
@@ -284,97 +304,116 @@ def page_upload():
 
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
-        try:
-            result = DeepFace.analyze(
-                img_path=rgb,
-                actions=["emotion", "gender"],   # age removed
-                enforce_detection=True,
-                detector_backend=st.session_state.detector_backend,
-            )
-        except Exception as e:
-            st.error(f"DeepFace error: {e}")
-            return
+        # Loader overlay placeholder
+        loader = st.empty()
+        loader.markdown(
+            """
+            <div class="loader-overlay">
+              <div class="loader-inner">
+                <img src="https://miro.medium.com/v2/resize:fit:750/format:webp/1*YF4KdQE-RadFtNa6n66wdg.gif"
+                     style="max-width:280px; border-radius:16px;" />
+                <p>Analyzing faces, emotions, and gender...</p>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-        faces_raw = result if isinstance(result, list) else [result]
-        annotated = bgr.copy()
-        h, w = bgr.shape[:2]
+        with st.spinner("Running DeepFace analysis..."):
+            try:
+                result = DeepFace.analyze(
+                    img_path=rgb,
+                    actions=["emotion", "gender"],
+                    enforce_detection=True,
+                    detector_backend=st.session_state.detector_backend,
+                )
+            except Exception as e:
+                loader.empty()
+                st.error(f"DeepFace error: {e}")
+                return
 
-        # --- Build sortable list of faces (top->bottom, left->right) ---
-        face_infos: List[Dict[str, Any]] = []
-        for r in faces_raw:
-            region = r.get("region") or {}
-            x = int(region.get("x", 0))
-            y = int(region.get("y", 0))
-            fw = int(region.get("w", 0))
-            fh = int(region.get("h", 0))
+            faces_raw = result if isinstance(result, list) else [result]
+            annotated = bgr.copy()
+            h, w = bgr.shape[:2]
 
-            x1 = max(0, x)
-            y1 = max(0, y)
-            x2 = min(w - 1, x + fw)
-            y2 = min(h - 1, y + fh)
+            # --- Build sortable list of faces (top->bottom, left->right) ---
+            face_infos: List[Dict[str, Any]] = []
+            for r in faces_raw:
+                region = r.get("region") or {}
+                x = int(region.get("x", 0))
+                y = int(region.get("y", 0))
+                fw = int(region.get("w", 0))
+                fh = int(region.get("h", 0))
 
-            if x2 <= x1 or y2 <= y1:
-                continue
+                x1 = max(0, x)
+                y1 = max(0, y)
+                x2 = min(w - 1, x + fw)
+                y2 = min(h - 1, y + fh)
 
-            cx = (x1 + x2) / 2.0
-            cy = (y1 + y2) / 2.0
+                if x2 <= x1 or y2 <= y1:
+                    continue
 
-            face_infos.append(
-                {
-                    "r": r,
-                    "x1": x1,
-                    "y1": y1,
-                    "x2": x2,
-                    "y2": y2,
-                    "cx": cx,
-                    "cy": cy,
-                }
-            )
+                cx = (x1 + x2) / 2.0
+                cy = (y1 + y2) / 2.0
 
-        # Sort by vertical then horizontal position
-        face_infos.sort(key=lambda f: (f["cy"], f["cx"]))
+                face_infos.append(
+                    {
+                        "r": r,
+                        "x1": x1,
+                        "y1": y1,
+                        "x2": x2,
+                        "y2": y2,
+                        "cx": cx,
+                        "cy": cy,
+                    }
+                )
 
-        results_table: List[Dict[str, Any]] = []
+            # Sort by vertical then horizontal position
+            face_infos.sort(key=lambda f: (f["cy"], f["cx"]))
 
-        # --- Draw colored boxes + build table ---
-        for idx, info in enumerate(face_infos, start=1):
-            r = info["r"]
-            x1, y1, x2, y2 = info["x1"], info["y1"], info["x2"], info["y2"]
+            results_table: List[Dict[str, Any]] = []
 
-            face = bgr[y1:y2, x1:x2]
+            # --- Draw colored boxes + build table ---
+            for idx, info in enumerate(face_infos, start=1):
+                r = info["r"]
+                x1, y1, x2, y2 = info["x1"], info["y1"], info["x2"], info["y2"]
 
-            # DeepFace attributes
-            emotion = r.get("dominant_emotion", "unknown")
+                face = bgr[y1:y2, x1:x2]
 
-            # Gender may be dict like {"Man": x, "Woman": y} or a string
-            raw_gender = r.get("gender") or r.get("dominant_gender")
-            if isinstance(raw_gender, dict):
-                # choose the gender with highest probability
-                gender = max(raw_gender, key=raw_gender.get)
-            else:
-                gender = raw_gender if raw_gender else "Unknown"
+                # DeepFace attributes
+                emotion = r.get("dominant_emotion", "unknown")
 
-            # Recognition (name only)
-            name, dist = recognizer.infer(face)
+                # Gender may be dict like {"Man": x, "Woman": y} or a string
+                raw_gender = r.get("gender") or r.get("dominant_gender")
+                if isinstance(raw_gender, dict) and raw_gender:
+                    gender = max(raw_gender, key=raw_gender.get)
+                else:
+                    gender = raw_gender if raw_gender else "Unknown"
 
-            # Pick color from palette
-            color_name, color_bgr = COLOR_PALETTE[(idx - 1) % len(COLOR_PALETTE)]
+                # Recognition (name only)
+                name, dist = recognizer.infer(face)
 
-            # Draw only the colored rectangle (no label text)
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), color_bgr, 3)
+                # Pick color from palette
+                color_name, color_bgr = COLOR_PALETTE[(idx - 1) % len(COLOR_PALETTE)]
 
-            results_table.append(
-                {
-                    "Face #": idx,
-                    "Color": color_name,
-                    "Name": name,
-                    "Gender": gender,
-                    "Emotion": emotion,
-                }
-            )
+                # Draw only the colored rectangle (no label text)
+                cv2.rectangle(annotated, (x1, y1), (x2, y2), color_bgr, 3)
 
-        st.session_state.annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
-        st.session_state.results_table = results_table
+                results_table.append(
+                    {
+                        "Face #": idx,
+                        "Color": color_name,
+                        "Name": name,
+                        "Gender": gender,
+                        "Emotion": emotion,
+                    }
+                )
+
+            st.session_state.annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
+            st.session_state.results_table = results_table
+
+        # Remove loader overlay, go to results
+        loader.empty()
         go_results()
 
     # Detect button using callback
