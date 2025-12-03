@@ -1,15 +1,24 @@
+-- ==========================================================
+--  Image Database (Schema + Example Queries)
+--  Save as: image_database_schema_and_queries.sql
+-- ==========================================================
+
 DROP DATABASE IF EXISTS image_database;
 CREATE DATABASE image_database;
 USE image_database;
 
 -- ==========================================================
 -- 1. Persons Table
+--    - age added
+--    - emotion ENUM updated to match DeepFace-style labels
+--      (angry, disgust, fear, happy, sad, surprise, neutral)
 -- ==========================================================
 CREATE TABLE persons (
     person_id   INT AUTO_INCREMENT PRIMARY KEY,
     name        VARCHAR(100) NOT NULL,
+    age         TINYINT UNSIGNED NULL,
     gender      ENUM('Male', 'Female', 'Other') NULL,
-    emotion     ENUM('Angry', 'Sad', 'Joyful', 'Confused', 'Neutral') NULL,
+    emotion     ENUM('angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral') NULL,
     location    VARCHAR(100) NULL,
     lighting    VARCHAR(50) NULL,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -57,14 +66,15 @@ CREATE TABLE group_members (
 );
 
 -- ==========================================================
--- 5. Predicted Emotions Table (from your attached file)
+-- 5. Predicted Emotions Table
+--    - emotion ENUM updated to DeepFace-style labels
 -- ==========================================================
 CREATE TABLE predicted_emotions (
     prediction_id INT AUTO_INCREMENT PRIMARY KEY,
-    image_id INT,
-    emotion ENUM('Angry', 'Sad', 'Joyful', 'Confused', 'Neutral'),
-    confidence DECIMAL(5,2),
-    detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    image_id      INT,
+    emotion       ENUM('angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral'),
+    confidence    DECIMAL(5,2),
+    detected_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (image_id) REFERENCES images(image_id)
         ON DELETE CASCADE
 );
@@ -88,30 +98,32 @@ END;
 DELIMITER ;
 
 ####################################################
+-- Example Queries (optional, for analysis / debugging)
+####################################################
 
 -- ----------------------------------------------------------
 -- Basic Viewing Queries
 -- ----------------------------------------------------------
 
-# View all people
+-- View all people
 SELECT * FROM persons;
 
-# View all images
+-- View all images
 SELECT * FROM images;
 
-# View all group scenes
+-- View all group scenes
 SELECT * FROM group_scenes;
 
-# View all group members
+-- View all group members
 SELECT * FROM group_members;
 
 -- ----------------------------------------------------------
 -- People and Their Images
 -- ----------------------------------------------------------
-
 SELECT 
     p.person_id,
     p.name,
+    p.age,
     i.image_id,
     i.pose,
     i.file_path
@@ -121,7 +133,6 @@ JOIN images i ON p.person_id = i.person_id;
 -- ----------------------------------------------------------
 -- Scenes and Their Members (with Roles)
 -- ----------------------------------------------------------
-
 SELECT 
     g.scene_id,
     g.location,
@@ -134,23 +145,20 @@ JOIN persons p ON gm.person_id = p.person_id
 ORDER BY g.scene_id;
 
 -- ----------------------------------------------------------
--- Joyful People in Coffee Shops
+-- Happy People in Coffee Shops (DeepFace 'happy')
 -- ----------------------------------------------------------
-
 SELECT name, emotion, location
 FROM persons
-WHERE emotion = 'Joyful' AND location = 'Coffee Shop';
+WHERE emotion = 'happy' AND location = 'Coffee Shop';
 
 -- ----------------------------------------------------------
 -- All Images Tagged “indoor”
 -- ----------------------------------------------------------
-
 SELECT * FROM images WHERE tags LIKE '%indoor%';
 
 -- ----------------------------------------------------------
 -- Photos Taken Under Warm Indoor Lighting
 -- ----------------------------------------------------------
-
 SELECT i.file_path, p.name, i.pose
 FROM images i
 JOIN persons p ON i.person_id = p.person_id
@@ -159,15 +167,13 @@ WHERE i.tags LIKE '%warm%' OR p.lighting = 'Warm Indoor';
 -- ----------------------------------------------------------
 -- Recently Added People (past 24 hours)
 -- ----------------------------------------------------------
-
-SELECT name, created_at
+SELECT name, age, created_at
 FROM persons
 WHERE created_at >= NOW() - INTERVAL 1 DAY;
 
 -- ----------------------------------------------------------
 -- Most Recently Added Group Members
 -- ----------------------------------------------------------
-
 SELECT p.name, g.location, gm.added_at
 FROM group_members gm
 JOIN persons p ON gm.person_id = p.person_id
@@ -177,9 +183,9 @@ ORDER BY gm.added_at DESC;
 -- ----------------------------------------------------------
 -- Full Context Query (People + Image + Scene)
 -- ----------------------------------------------------------
-
 SELECT
     p.name,
+    p.age,
     p.gender,
     p.emotion,
     i.pose,
@@ -196,7 +202,6 @@ ORDER BY g.scene_id, p.name;
 -- ----------------------------------------------------------
 -- Emotion Counts
 -- ----------------------------------------------------------
-
 SELECT emotion, COUNT(*) AS total_people
 FROM persons
 GROUP BY emotion;
@@ -204,7 +209,6 @@ GROUP BY emotion;
 -- ----------------------------------------------------------
 -- Images Per Person
 -- ----------------------------------------------------------
-
 SELECT p.name, COUNT(i.image_id) AS total_images
 FROM persons p
 LEFT JOIN images i ON p.person_id = i.person_id
@@ -213,7 +217,6 @@ GROUP BY p.person_id;
 -- ----------------------------------------------------------
 -- Scenes With More Than 5 People
 -- ----------------------------------------------------------
-
 SELECT scene_id, location, people_count
 FROM group_scenes
 WHERE people_count > 5;
@@ -221,7 +224,6 @@ WHERE people_count > 5;
 -- ----------------------------------------------------------
 -- Trends (Predicted Emotions)
 -- ----------------------------------------------------------
-
 SELECT i.file_path, e.emotion, e.confidence, e.detected_at
 FROM predicted_emotions e
 JOIN images i ON e.image_id = i.image_id;
@@ -229,7 +231,6 @@ JOIN images i ON e.image_id = i.image_id;
 -- ----------------------------------------------------------
 -- Tag Verification
 -- ----------------------------------------------------------
-
 SELECT scene_id, location, lighting, people_count, tags
 FROM group_scenes;
 

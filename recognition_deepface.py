@@ -17,7 +17,12 @@ class RecognizerDeepFace:
     - `infer()` finds the closest embedding and returns (name, distance)
     """
 
-    def __init__(self, model_name: str = "Facenet512", db_path: str = "faces_db", threshold: float = 1.0) -> None:
+    def __init__(
+        self,
+        model_name: str = "Facenet512",
+        db_path: str = "faces_db",
+        threshold: float = 1.0,
+    ) -> None:
         self.model_name = model_name
         self.db_path = Path(db_path)
         self.threshold = threshold
@@ -45,6 +50,7 @@ class RecognizerDeepFace:
                 rep = DeepFace.represent(
                     img_path=rgb,
                     model_name=self.model_name,
+                    detector_backend="opencv",
                     enforce_detection=False,
                 )
                 if isinstance(rep, list):
@@ -64,6 +70,7 @@ class RecognizerDeepFace:
         rep = DeepFace.represent(
             img_path=rgb,
             model_name=self.model_name,
+            detector_backend="opencv",
             enforce_detection=False,
         )
         if isinstance(rep, list):
