@@ -14,7 +14,38 @@ from recognition_deepface import RecognizerDeepFace
 
 # ---------- STREAMLIT PAGE CONFIG ----------
 st.set_page_config(page_title="Visual Detection (DeepFace)", layout="wide")
-st.title("Visual Detection (DeepFace)")
+
+# Global CSS for animations and intro styling
+st.markdown(
+    """
+    <style>
+    @keyframes fadeUp {
+        0%   { opacity: 0; transform: translateY(12px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-in      { opacity: 0; animation: fadeUp 0.8s ease-out forwards; }
+    .fade-1       { animation-delay: 0.1s; }
+    .fade-2       { animation-delay: 0.4s; }
+    .fade-3       { animation-delay: 0.7s; }
+    .fade-4       { animation-delay: 1.0s; }
+
+    /* Animated dots after the intro line */
+    @keyframes dotsBlink {
+        0%   { content: '';   }
+        25%  { content: '.';  }
+        50%  { content: '..'; }
+        75%  { content: '...';}
+        100% { content: '';   }
+    }
+    .typing-dots::after {
+        content: '';
+        animation: dotsBlink 1.2s steps(4, end) infinite;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # ---------- WELCOME / START SCREEN ----------
@@ -25,27 +56,30 @@ if not st.session_state.started:
     st.markdown(
         """
         <div style='text-align:center; padding-top:80px;'>
-            <h1 style='font-size:48px; font-weight:700;'>
+            <h1 class='fade-in fade-1' style='font-size:48px; font-weight:700;'>
                 Welcome to Visual Detection
             </h1>
-            <h3 style='color:#aaaaaa; margin-top:-10px;'>
+            <h3 class='fade-in fade-2' style='color:#aaaaaa; margin-top:-10px; font-size:18px;'>
                 Using DeepFace for face analysis
             </h3>
-            <p style='font-size:20px; margin-top:30px; max-width:600px; margin-left:auto; margin-right:auto;'>
-                Press <strong>Start</strong> to upload an image and unfold true identities...
+            <p class='fade-in fade-3 typing-dots'
+               style='font-size:20px; margin-top:30px; max-width:600px; margin-left:auto; margin-right:auto;'>
+                Press <strong>Start</strong> to upload an image and unfold true identities
             </p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    start = st.button("Start", type="primary")
+    # Centered Start button
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        start = st.button("Start", type="primary", use_container_width=True)
 
     if start:
         st.session_state.started = True
 
-    # Stop here so the rest of the UI doesn't render until Start is pressed
-    st.stop()
+    st.stop()  # Stop here so the rest of the UI doesn't render yet
 
 
 # ---------- CACHED RECOGNIZER ----------
@@ -168,7 +202,7 @@ if img_file and run_button:
                 {
                     "Face #": idx,
                     "Name": name,
-                    "Range": range_label,  # Distance → Range
+                    "Range": range_label,
                     "Emotion": emotion,
                 }
             )
