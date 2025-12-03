@@ -54,11 +54,6 @@ st.markdown(
         text-align: center;
         animation: fadeUp 0.6s ease-out forwards;
     }
-    .loader-inner p {
-        margin-top: 16px;
-        color: #eeeeee;
-        font-size: 18px;
-    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -304,15 +299,14 @@ def page_upload():
 
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
-        # Loader overlay placeholder
+        # Loader overlay placeholder (full-screen, centered, no text)
         loader = st.empty()
         loader.markdown(
             """
             <div class="loader-overlay">
               <div class="loader-inner">
                 <img src="https://miro.medium.com/v2/resize:fit:750/format:webp/1*YF4KdQE-RadFtNa6n66wdg.gif"
-                     style="max-width:280px; border-radius:16px;" />
-                <p>Analyzing faces, emotions, and gender...</p>
+                     style="width:380px; border-radius:20px;" />
               </div>
             </div>
             """,
