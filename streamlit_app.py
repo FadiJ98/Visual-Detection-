@@ -341,7 +341,7 @@ def page_upload():
         help="Static images only (no live camera).",
     )
 
-    # ---------- START DETECTION (NAVIGATE TO LOADING PAGE) ----------
+    # ---------- START DETECTION ----------
     def start_detection():
         if img_file is None:
             return
@@ -362,7 +362,6 @@ def page_loading():
     set_black_background()
     top_nav()  # just Home
 
-    # Centered GIF (big)
     st.markdown(
         """
         <div style="display:flex; justify-content:center; align-items:center; height:80vh;">
@@ -375,7 +374,7 @@ def page_loading():
         unsafe_allow_html=True,
     )
 
-    # Only run detection once when pending_detection is True
+    # run detection one time
     if st.session_state.pending_detection and st.session_state.uploaded_image_bytes:
         with st.spinner("Running DeepFace analysis..."):
             img_bytes = st.session_state.uploaded_image_bytes
@@ -405,7 +404,7 @@ def page_loading():
             annotated = bgr.copy()
             h, w = bgr.shape[:2]
 
-            # --- Build sortable list of faces (top->bottom, left->right) ---
+            # --- Build sortable list of faces ---
             face_infos: List[Dict[str, Any]] = []
             for r in faces_raw:
                 region = r.get("region") or {}
@@ -441,7 +440,7 @@ def page_loading():
 
             results_table: List[Dict[str, Any]] = []
 
-            # --- Draw colored boxes + build table ---
+            # --- Draw boxes & build table ---
             for idx, info in enumerate(face_infos, start=1):
                 r = info["r"]
                 x1, y1, x2, y2 = info["x1"], info["y1"], info["x2"], info["y2"]
@@ -488,7 +487,7 @@ def page_loading():
 def page_results():
     set_black_background()
 
-    top_nav(show_back_to="upload")  # Home + Back to Image Upload
+    top_nav(show_back_to="upload")
 
     st.markdown(
         """
