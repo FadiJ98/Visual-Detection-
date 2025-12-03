@@ -44,6 +44,35 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ---------- HELPER: SET BACKGROUND ----------
+BG_GIF = "https://mir-s3-cdn-cf.behance.net/project_modules/disp/9c0722106004343.5f85fead2894a.gif"
+
+
+def set_background(use_gif: bool) -> None:
+    """Apply / remove the animated background on the whole app."""
+    if use_gif:
+        css = f"""
+        <style>
+        .stApp {{
+            background-image: url('{BG_GIF}');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+        }}
+        </style>
+        """
+    else:
+        css = """
+        <style>
+        .stApp {
+            background-image: none;
+            background-color: #0e1117;
+        }
+        </style>
+        """
+    st.markdown(css, unsafe_allow_html=True)
+
 
 # ---------- SESSION STATE SETUP ----------
 if "page" not in st.session_state:
@@ -159,19 +188,36 @@ def load_recognizer() -> RecognizerDeepFace:
 recognizer = load_recognizer()
 
 
+# ---------- COMMON: TOP NAV BAR (HOME + BACK) ----------
+def top_nav(show_back_to=None):
+    """show_back_to: None, 'settings', or 'upload' """
+    cols = st.columns([1, 1, 6])
+    with cols[0]:
+        st.button("Home", key=f"home_{st.session_state.page}", on_click=reset_all)
+
+    if show_back_to == "settings":
+        with cols[1]:
+            st.button("Back to Settings", on_click=go_settings)
+    elif show_back_to == "upload":
+        with cols[1]:
+            st.button("Back to Image Upload", on_click=go_upload)
+
+
 # ---------- PAGE: WELCOME ----------
 def page_welcome():
+    set_background(True)
+
     st.markdown(
         """
         <div style='text-align:center; padding-top:80px;'>
-            <h1 class='fade-in fade-1' style='font-size:48px; font-weight:700;'>
+            <h1 class='fade-in fade-1' style='font-size:48px; font-weight:700; color:#ffffff;'>
                 Welcome to Visual Detection
             </h1>
-            <h3 class='fade-in fade-2' style='color:#aaaaaa; margin-top:-10px; font-size:18px;'>
+            <h3 class='fade-in fade-2' style='color:#eeeeee; margin-top:-10px; font-size:18px;'>
                 Using DeepFace for face analysis
             </h3>
             <p class='fade-in fade-3 typing-dots'
-               style='font-size:20px; margin-top:30px; max-width:600px; margin-left:auto; margin-right:auto;'>
+               style='font-size:20px; margin-top:30px; max-width:600px; margin-left:auto; margin-right:auto; color:#ffffff;'>
                 Press <strong>Start</strong> to upload an image and unfold true identities
             </p>
         </div>
@@ -189,30 +235,17 @@ def page_welcome():
         )
 
 
-# ---------- COMMON: TOP NAV BAR (HOME + BACK) ----------
-def top_nav(show_back_to=None):
-    """show_back_to: None, 'settings', or 'upload' """
-    cols = st.columns([1, 1, 6])
-    with cols[0]:
-        st.button("Home", key=f"home_{st.session_state.page}", on_click=reset_all)
-
-    if show_back_to == "settings":
-        with cols[1]:
-            st.button("Back to Settings", on_click=go_settings)
-    elif show_back_to == "upload":
-        with cols[1]:
-            st.button("Back to Image Upload", on_click=go_upload)
-
-
 # ---------- PAGE: SETTINGS ----------
 def page_settings():
+    set_background(True)
+
     top_nav()  # Home only
 
     st.markdown(
         """
         <div class='fade-in fade-1' style='text-align:center; padding-top:40px;'>
-            <h2>Select a detection backend</h2>
-            <p style='color:#aaaaaa; max-width:600px; margin:10px auto 30px auto;'>
+            <h2 style="color:#ffffff;">Select a detection backend</h2>
+            <p style='color:#dddddd; max-width:600px; margin:10px auto 30px auto;'>
                 Choose how faces are detected before emotion and identity analysis.
             </p>
         </div>
@@ -224,8 +257,8 @@ def page_settings():
     with col1:
         st.markdown(
             "<div class='fade-in fade-2' style='text-align:center;'>"
-            "<h3>OpenCV</h3>"
-            "<p style='color:#bbbbbb;'>Fast, classic Haar-based detection.</p>"
+            "<h3 style='color:#ffffff;'>OpenCV</h3>"
+            "<p style='color:#dddddd;'>Fast, classic Haar-based detection.</p>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -235,8 +268,8 @@ def page_settings():
     with col2:
         st.markdown(
             "<div class='fade-in fade-3' style='text-align:center;'>"
-            "<h3>RetinaFace</h3>"
-            "<p style='color:#bbbbbb;'>More accurate modern deep-learning detector.</p>"
+            "<h3 style='color:#ffffff;'>RetinaFace</h3>"
+            "<p style='color:#dddddd;'>More accurate modern deep-learning detector.</p>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -245,7 +278,7 @@ def page_settings():
 
     if st.session_state.detector_backend:
         st.markdown(
-            f"<p style='text-align:center; margin-top:30px; color:#888;'>"
+            f"<p style='text-align:center; margin-top:30px; color:#e0e0e0;'>"
             f"Current selection: <strong>{st.session_state.detector_backend}</strong>"
             f"</p>",
             unsafe_allow_html=True,
@@ -254,13 +287,15 @@ def page_settings():
 
 # ---------- PAGE: UPLOAD ----------
 def page_upload():
+    set_background(True)
+
     top_nav(show_back_to="settings")  # Home + Back to Settings
 
     st.markdown(
         """
         <div class='fade-in fade-1' style='padding-top:20px;'>
-            <h2>Upload an image</h2>
-            <p style='color:#aaaaaa;'>
+            <h2 style="color:#ffffff;">Upload an image</h2>
+            <p style='color:#dddddd;'>
                 Choose a photo and run detection with your selected backend.
             </p>
         </div>
@@ -303,15 +338,16 @@ def page_upload():
 
 # ---------- PAGE: LOADING (GIF + ANALYSIS) ----------
 def page_loading():
+    set_background(False)  # plain dark background here
     top_nav()  # just Home
 
-    # Centered GIF (2x bigger)
+    # Centered GIF (big)
     st.markdown(
         """
         <div style="display:flex; justify-content:center; align-items:center; height:80vh;">
           <div style="text-align:center;">
             <img src="https://miro.medium.com/v2/1*4Tr0FOsdUgkF32T3mdu6pg.gif"
-                 style="width:720px; max-width:90vw; border-radius:20px;"/>
+                 style="width:760px; max-width:90vw; border-radius:20px;"/>
           </div>
         </div>
         """,
@@ -429,6 +465,8 @@ def page_loading():
 
 # ---------- PAGE: RESULTS ----------
 def page_results():
+    set_background(False)  # plain dark background for results
+
     top_nav(show_back_to="upload")  # Home + Back to Image Upload
 
     st.markdown(
