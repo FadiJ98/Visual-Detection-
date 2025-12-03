@@ -287,7 +287,7 @@ def page_upload():
         try:
             result = DeepFace.analyze(
                 img_path=rgb,
-                actions=["emotion", "gender"],   # <-- age removed
+                actions=["emotion", "gender"],   # age removed
                 enforce_detection=True,
                 detector_backend=st.session_state.detector_backend,
             )
@@ -345,7 +345,14 @@ def page_upload():
 
             # DeepFace attributes
             emotion = r.get("dominant_emotion", "unknown")
-            gender = r.get("gender") or r.get("dominant_gender", "unknown")
+
+            # Gender may be dict like {"Man": x, "Woman": y} or a string
+            raw_gender = r.get("gender") or r.get("dominant_gender")
+            if isinstance(raw_gender, dict):
+                # choose the gender with highest probability
+                gender = max(raw_gender, key=raw_gender.get)
+            else:
+                gender = raw_gender if raw_gender else "Unknown"
 
             # Recognition (name only)
             name, dist = recognizer.infer(face)
@@ -359,10 +366,10 @@ def page_upload():
             results_table.append(
                 {
                     "Face #": idx,
+                    "Color": color_name,
                     "Name": name,
                     "Gender": gender,
                     "Emotion": emotion,
-                    "Color": color_name,
                 }
             )
 
