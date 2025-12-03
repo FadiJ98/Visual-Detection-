@@ -5,38 +5,39 @@ from typing import List, Tuple, Dict, Any
 
 import cv2
 import numpy as np
-from deepface import DeepFace
 
 
 class RecognizerDeepFace:
     """
-    Simple DeepFace-based face recognizer.
+    Lightweight face recognizer (no DeepFace models).
 
-    - Recursively loads all image files under `db_path`
-    - Filenames are used for metadata:
-
+    - Recursively loads all face images under `db_path`
+    - Filenames store metadata:
         Tom-Cruise_63_1.jpg  ->  name = "Tom Cruise", age = 63
         mr-beast_29_3.png    ->  name = "mr beast",  age = 29
 
-    - Uses DeepFace.represent(model_name=...) to compute embeddings
-    - infer() finds the closest embedding and returns (name, distance)
+    - For each DB image we build a simple embedding:
+        - convert to gray
+        - resize to 128x128
+        - flatten to a 1D vector
+    - infer() compares the uploaded face to all DB embeddings
+      using L2 distance and returns (name, distance).
     """
 
     def __init__(
         self,
-        model_name: str = "Facenet512",
+        model_name: str = "dummy",          # kept for compatibility
         db_path: str = "faces_db",
-        threshold: float = 1.0,
+        threshold: float = 2000.0,          # tune for “Unknown”
     ) -> None:
-        self.model_name = model_name
         self.db_path = Path(db_path)
         self.threshold = threshold
 
         self.db_path.mkdir(parents=True, exist_ok=True)
 
         self.embeddings: List[np.ndarray] = []
-        self.labels: List[str] = []                   # display names
-        self.profiles: Dict[str, Dict[str, Any]] = {}  # name -> { "age": int | None }
+        self.labels: List[str] = []                    # display names
+        self.profiles: Dict[str, Dict[str, Any]] = {}  # name -> {"age": int | None}
 
         self._load_db()
 
@@ -47,6 +48,7 @@ class RecognizerDeepFace:
         Parse filename stem like 'Tom-Cruise_63_1' into:
             name = 'Tom Cruise'
             age  = 63
+
         If age missing or invalid -> age = None.
         """
         parts = stem.split("_")
@@ -63,6 +65,23 @@ class RecognizerDeepFace:
 
         return name, age
 
+    # ----------------- EMBEDDING HELPER -----------------
+    @staticmethod
+    def _to_embedding(img_bgr: np.ndarray) -> np.ndarray:
+        """
+        Turn a BGR face image into a small numeric embedding.
+        (Very simple: grayscale + resize + flatten.)
+        """
+        if img_bgr is None or img_bgr.size == 0:
+            return np.zeros((128 * 128,), dtype="float32")
+
+        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+        face_resized = cv2.resize(gray, (128, 128), interpolation=cv2.INTER_AREA)
+        vec = face_resized.flatten().astype("float32")
+        # normalize to reduce brightness differences
+        norm = np.linalg.norm(vec) + 1e-8
+        return vec / norm
+
     # ----------------- LOAD DB -----------------
     def _load_db(self) -> None:
         """Recursively load all face images under db_path and compute embeddings."""
@@ -76,44 +95,17 @@ class RecognizerDeepFace:
             if img is None:
                 continue
 
-            try:
-                rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                rep = DeepFace.represent(
-                    img_path=rgb,
-                    model_name=self.model_name,
-                    enforce_detection=False,
-                )
-                if isinstance(rep, list):
-                    rep = rep[0]
-
-                vec = np.array(rep["embedding"], dtype="float32")
-            except Exception:
-                # Skip any images that cause errors
-                continue
+            emb = self._to_embedding(img)
 
             name, age = self._parse_label(file.stem)
 
-            self.embeddings.append(vec)
+            self.embeddings.append(emb)
             self.labels.append(name)
 
-            # store / update simple profile (age)
             profile = self.profiles.get(name, {})
             if profile.get("age") is None and age is not None:
                 profile["age"] = age
             self.profiles[name] = profile
-
-    # ----------------- EMBED FACE -----------------
-    def embed(self, face_bgr: np.ndarray) -> np.ndarray:
-        """Return embedding vector for a cropped BGR face image."""
-        rgb = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2RGB)
-        rep = DeepFace.represent(
-            img_path=rgb,
-            model_name=self.model_name,
-            enforce_detection=False,
-        )
-        if isinstance(rep, list):
-            rep = rep[0]
-        return np.array(rep["embedding"], dtype="float32")
 
     # ----------------- INFER NAME -----------------
     def infer(self, face_bgr: np.ndarray) -> Tuple[str, float]:
@@ -122,15 +114,12 @@ class RecognizerDeepFace:
         If no match or DB empty → ("Unknown", large_distance).
         """
         if face_bgr is None or face_bgr.size == 0:
-            return "Unknown", 999.0
+            return "Unknown", 9999.0
 
         if not self.embeddings:
-            return "Unknown", 999.0
+            return "Unknown", 9999.0
 
-        try:
-            vec = self.embed(face_bgr)
-        except Exception:
-            return "Unknown", 999.0
+        vec = self._to_embedding(face_bgr)
 
         dists = [float(np.linalg.norm(vec - e)) for e in self.embeddings]
         idx = int(np.argmin(dists))
