@@ -1,4 +1,3 @@
-# streamlit_app.py
 from __future__ import annotations
 
 from typing import List, Dict, Any
@@ -99,20 +98,6 @@ def reset_image():
     st.session_state.upload_key += 1
     st.session_state.results_table = []
     st.session_state.annotated_rgb = None
-
-
-# ---------- HELPER: DISTANCE → RANGE ----------
-def distance_to_range(dist: float) -> str:
-    if dist < 0.35:
-        return "Very close"
-    elif dist < 0.55:
-        return "Close"
-    elif dist < 0.75:
-        return "Midrange"
-    elif dist < 1.0:
-        return "Far"
-    else:
-        return "Very far"
 
 
 # ---------- COLOR PALETTE (name, BGR) ----------
@@ -302,7 +287,7 @@ def page_upload():
         try:
             result = DeepFace.analyze(
                 img_path=rgb,
-                actions=["emotion"],
+                actions=["emotion", "age", "gender"],
                 enforce_detection=True,
                 detector_backend=st.session_state.detector_backend,
             )
@@ -357,11 +342,20 @@ def page_upload():
             x1, y1, x2, y2 = info["x1"], info["y1"], info["x2"], info["y2"]
 
             face = bgr[y1:y2, x1:x2]
-            emotion = r.get("dominant_emotion", "unknown")
 
-            # Recognition + range
+            # DeepFace attributes
+            emotion = r.get("dominant_emotion", "unknown")
+            age = r.get("age", None)
+            gender = r.get("gender") or r.get("dominant_gender", "unknown")
+
+            if age is not None:
+                try:
+                    age = int(round(float(age)))
+                except Exception:
+                    pass  # leave as-is if conversion fails
+
+            # Recognition (name only)
             name, dist = recognizer.infer(face)
-            range_label = distance_to_range(float(dist))
 
             # Pick color from palette
             color_name, color_bgr = COLOR_PALETTE[(idx - 1) % len(COLOR_PALETTE)]
@@ -373,7 +367,8 @@ def page_upload():
                 {
                     "Face #": idx,
                     "Name": name,
-                    "Range": range_label,
+                    "Age": age,
+                    "Gender": gender,
                     "Emotion": emotion,
                     "Color": color_name,
                 }
@@ -401,7 +396,7 @@ def page_results():
         <div class='fade-in fade-1' style='padding-top:20px;'>
             <h2>Detection Results</h2>
             <p style='color:#aaaaaa;'>
-                Review the detected faces, emotions, ranges, and colors.
+                Review the detected faces, ages, genders, emotions, and colors.
             </p>
         </div>
         """,
