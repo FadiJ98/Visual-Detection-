@@ -18,10 +18,44 @@ WINDOW_TITLE = "Visual Detection — DeepFace Only"
 WINDOW_SIZE = "1920x1080"
 BG_COLOR = "#1e1e1e"
 CANVAS_BG = "#0f0f0f"
-BOX_COLOR = (0, 255, 0)
+BOX_COLOR = (0, 255, 0)   # still here, but we now use per-face colors
 TEXT_SCALE = 0.6
 TEXT_THICKNESS = 2
 FONT = cv2.FONT_HERSHEY_SIMPLEX
+
+# ---------- COLOR PALETTE (BGR) ----------
+COLOR_PALETTE: List[tuple[str, tuple[int, int, int]]] = [
+    ("Blue",       (255,  80,  20)),
+    ("Green",      ( 80, 220,  80)),
+    ("Orange",     ( 40, 140, 255)),
+    ("Yellow",     ( 40, 230, 255)),
+    ("Purple",     (200,  80, 200)),
+    ("Brown",      ( 40,  60, 140)),
+    ("Gray",       (160, 160, 160)),
+    ("Red",        ( 40,  40, 255)),
+    ("Olive",      ( 60, 120,  60)),
+    ("Maroon",     ( 40,  40, 140)),
+    ("Violet",     (230, 130, 230)),
+    ("Charcoal",   ( 60,  60,  60)),
+    ("Magenta",    (230,  80, 230)),
+    ("Bronze",     ( 60, 120, 200)),
+    ("Cream",      (210, 220, 230)),
+    ("Tan",        (140, 180, 220)),
+    ("Teal",       (140, 200, 140)),
+    ("Black",      (  0,   0,   0)),
+    ("Mustard",    ( 60, 200, 220)),
+    ("Navy Blue",  (180,  60,  40)),
+    ("Coral",      (120, 160, 255)),
+    ("Burgundy",   ( 40,  40, 110)),
+    ("Lavender",   (220, 200, 250)),
+    ("Mauve",      (200, 180, 220)),
+    ("Peach",      (180, 200, 240)),
+    ("Rust",       ( 60,  80, 160)),
+    ("Gold",       ( 40, 200, 255)),
+    ("Pink",       (220, 180, 250)),
+    ("Silver",     (200, 200, 200)),
+    ("Cyan",       (250, 220,  80)),
+]
 
 
 class VisualDetectionApp:
@@ -39,6 +73,8 @@ class VisualDetectionApp:
         self.current_path: Optional[Path] = None
         self.last_emotions: List[str] = []
         self.last_names: List[str] = []
+        self.last_ages: List[str] = []       # NEW
+        self.last_genders: List[str] = []    # NEW
 
         # DeepFace recognizer (embeddings + DB)
         self.recognizer = RecognizerDeepFace(model_name="Facenet512")
@@ -98,7 +134,7 @@ class VisualDetectionApp:
         )
         self.save_btn.pack(side="left", padx=5)
 
-        # NEW — Clear Button
+        # Clear Button
         self.clear_btn = ttk.Button(
             toolbar,
             text="Clear",
@@ -135,6 +171,8 @@ class VisualDetectionApp:
         self.cv_annotated = None
         self.last_emotions.clear()
         self.last_names.clear()
+        self.last_ages.clear()
+        self.last_genders.clear()
 
         self.detect_btn.config(state="normal")
         self.save_btn.config(state="disabled")
@@ -167,7 +205,7 @@ class VisualDetectionApp:
         cv2.imwrite(out, self.cv_annotated)
         self.status.config(text=f"Saved: {Path(out).name}")
 
-    # ---------- NEW — CLEAR IMAGE ----------
+    # ---------- CLEAR IMAGE ----------
     def clear_image(self) -> None:
         self.cv_bgr = None
         self.cv_annotated = None
@@ -175,6 +213,8 @@ class VisualDetectionApp:
         self.current_path = None
         self.last_emotions.clear()
         self.last_names.clear()
+        self.last_ages.clear()
+        self.last_genders.clear()
 
         self.detect_btn.config(state="disabled")
         self.save_btn.config(state="disabled")
@@ -183,7 +223,7 @@ class VisualDetectionApp:
         self.status.config(text="Image cleared.")
         self._redraw()
 
-    # ---------- DETECTION + EMOTION + RECOGNITION ----------
+    # ---------- DETECTION + EMOTION + AGE + GENDER + RECOGNITION ----------
     def detect_faces(self) -> None:
         if self.cv_bgr is None:
             return
@@ -194,7 +234,7 @@ class VisualDetectionApp:
         try:
             result = DeepFace.analyze(
                 img_path=rgb,
-                actions=["emotion"],
+                actions=["emotion", "age", "gender"],
                 enforce_detection=True,
                 detector_backend="retinaface",
             )
@@ -207,10 +247,12 @@ class VisualDetectionApp:
         annotated = bgr.copy()
         self.last_emotions.clear()
         self.last_names.clear()
+        self.last_ages.clear()
+        self.last_genders.clear()
 
         h, w = bgr.shape[:2]
 
-        for r in faces:
+        for idx, r in enumerate(faces, start=1):
             region = r.get("region") or {}
             x = int(region.get("x", 0))
             y = int(region.get("y", 0))
@@ -226,25 +268,31 @@ class VisualDetectionApp:
 
             face = bgr[y1:y2, x1:x2]
 
+            # DeepFace attributes
             emotion = r.get("dominant_emotion", "unknown")
-            self.last_emotions.append(emotion)
+            age = r.get("age", None)
+            gender = r.get("gender") or r.get("dominant_gender", "unknown")
 
+            # Clean age
+            if age is not None:
+                try:
+                    age = int(round(float(age)))
+                except Exception:
+                    pass
+
+            self.last_emotions.append(str(emotion))
+            self.last_ages.append(str(age) if age is not None else "?")
+            self.last_genders.append(str(gender))
+
+            # Recognition
             name, dist = self.recognizer.infer(face)
             self.last_names.append(name)
 
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), BOX_COLOR, 2)
+            # Choose color for this face (cycled)
+            _, color_bgr = COLOR_PALETTE[(idx - 1) % len(COLOR_PALETTE)]
 
-            label = emotion if name == "Unknown" else f"{name} | {emotion}"
-            y_text = max(15, y1 - 10)
-            cv2.putText(
-                annotated,
-                label,
-                (x1, y_text),
-                FONT,
-                TEXT_SCALE,
-                BOX_COLOR,
-                TEXT_THICKNESS,
-            )
+            # Draw ONLY a colored rectangle (no text on the image)
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), color_bgr, 3)
 
         self.cv_annotated = annotated
         self.save_btn.config(state="normal")
@@ -252,7 +300,13 @@ class VisualDetectionApp:
 
         if faces:
             self.status.config(
-                text=f"Faces: {len(faces)} | Emotions: {', '.join(self.last_emotions)}"
+                text=(
+                    f"Faces: {len(faces)} | "
+                    f"Names: {', '.join(self.last_names)} | "
+                    f"Ages: {', '.join(self.last_ages)} | "
+                    f"Genders: {', '.join(self.last_genders)} | "
+                    f"Emotions: {', '.join(self.last_emotions)}"
+                )
             )
         else:
             self.status.config(text="No faces found.")
@@ -299,4 +353,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

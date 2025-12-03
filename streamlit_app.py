@@ -287,7 +287,7 @@ def page_upload():
         try:
             result = DeepFace.analyze(
                 img_path=rgb,
-                actions=["emotion", "age", "gender"],
+                actions=["emotion", "gender"],   # <-- age removed
                 enforce_detection=True,
                 detector_backend=st.session_state.detector_backend,
             )
@@ -345,14 +345,7 @@ def page_upload():
 
             # DeepFace attributes
             emotion = r.get("dominant_emotion", "unknown")
-            age = r.get("age", None)
             gender = r.get("gender") or r.get("dominant_gender", "unknown")
-
-            if age is not None:
-                try:
-                    age = int(round(float(age)))
-                except Exception:
-                    pass  # leave as-is if conversion fails
 
             # Recognition (name only)
             name, dist = recognizer.infer(face)
@@ -367,7 +360,6 @@ def page_upload():
                 {
                     "Face #": idx,
                     "Name": name,
-                    "Age": age,
                     "Gender": gender,
                     "Emotion": emotion,
                     "Color": color_name,
@@ -396,7 +388,7 @@ def page_results():
         <div class='fade-in fade-1' style='padding-top:20px;'>
             <h2>Detection Results</h2>
             <p style='color:#aaaaaa;'>
-                Review the detected faces, ages, genders, emotions, and colors.
+                Review the detected faces, genders, emotions, and colors.
             </p>
         </div>
         """,
