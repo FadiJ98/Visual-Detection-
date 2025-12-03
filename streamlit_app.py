@@ -216,9 +216,9 @@ recognizer = load_recognizer()
 
 
 # ---------- SAVE REGISTERED FACE ----------
-def save_registered_face(name: str, age: int, gender: str, uploaded_file) -> str:
+def save_registered_face(name: str, gender: str, uploaded_file) -> str:
     """
-    Save uploaded face into faces_db/<safe_name>/safe-name_age_gender_index.ext
+    Save uploaded face into faces_db/<safe_name>/safe-name_gender_index.ext
     Returns the full path as string.
     """
     faces_root = Path("faces_db")
@@ -232,10 +232,10 @@ def save_registered_face(name: str, age: int, gender: str, uploaded_file) -> str
     ext = Path(uploaded_file.name).suffix.lower() or ".jpg"
 
     # count existing files for this person
-    existing = list(person_dir.glob(f"{safe_name}_*_*_*{ext}"))
+    existing = list(person_dir.glob(f"{safe_name}_*_*{ext}"))
     idx = len(existing) + 1
 
-    filename = f"{safe_name}_{age}_{gender.lower()}_{idx}{ext}"
+    filename = f"{safe_name}_{gender.lower()}_{idx}{ext}"
     out_path = person_dir / filename
 
     file_bytes = np.frombuffer(uploaded_file.getvalue(), np.uint8)
@@ -368,7 +368,7 @@ def page_register():
         <div class='fade-in fade-1' style='text-align:center; padding-top:40px;'>
             <h2 style="color:#ffffff;">Register a New Face</h2>
             <p style='color:#dddddd; max-width:600px; margin:10px auto 0 auto;'>
-                Upload a face image and enter name, age, and gender.
+                Upload a face image and enter name and gender.
                 The system will save it so future photos can be recognized.
             </p>
         </div>
@@ -378,7 +378,6 @@ def page_register():
 
     with st.form("register_face_form"):
         name = st.text_input("Name *", help="e.g., Tom Cruise, Mr Beast")
-        age = st.number_input("Age *", min_value=1, max_value=120, step=1)
         gender = st.selectbox("Gender *", ["male", "female", "other"])
         uploaded = st.file_uploader(
             "Upload a face image *",
@@ -392,7 +391,7 @@ def page_register():
             return
 
         try:
-            path = save_registered_face(name, int(age), gender, uploaded)
+            path = save_registered_face(name, gender, uploaded)
             # reload recognizer so it sees the new face
             recognizer.reload()
             st.success(f"Saved face for **{name}** at `{path}` and reloaded database.")
@@ -486,7 +485,7 @@ def page_loading():
             try:
                 result = DeepFace.analyze(
                     img_path=rgb,
-                    actions=["emotion", "gender", "age"],
+                    actions=["emotion", "gender"],
                     enforce_detection=True,
                     detector_backend=st.session_state.detector_backend,
                 )
@@ -551,21 +550,16 @@ def page_loading():
                 else:
                     gender_pred = raw_gender if raw_gender else "Unknown"
 
-                age_pred = r.get("age", None)
-
                 # Recognition
                 name, dist = recognizer.infer(face)
 
                 # Stored profile (from filename) if any
                 profile = recognizer.get_profile(name)
-                age_meta = profile.get("age")
                 gender_meta = profile.get("gender")
 
                 if name == "Unknown":
-                    age_final = age_pred
                     gender_final = gender_pred
                 else:
-                    age_final = age_meta if age_meta is not None else age_pred
                     gender_final = gender_meta if gender_meta is not None else gender_pred
 
                 color_name, color_bgr = COLOR_PALETTE[(idx - 1) % len(COLOR_PALETTE)]
@@ -577,7 +571,6 @@ def page_loading():
                         "Face #": idx,
                         "Color": color_name,
                         "Name": name,
-                        "Age": age_final,
                         "Gender": gender_final,
                         "Emotion": emotion,
                     }
@@ -606,7 +599,7 @@ def page_results():
         <div class='fade-in fade-1' style='padding-top:20px;'>
             <h2 style="color:#ffffff;">Detection Results</h2>
             <p style='color:#aaaaaa;'>
-                Review the detected faces, names, ages, genders, and emotions.
+                Review the detected faces, names, genders, and emotions.
             </p>
         </div>
         """,

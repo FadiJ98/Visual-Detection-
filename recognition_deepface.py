@@ -8,28 +8,23 @@ import numpy as np
 from deepface import DeepFace
 
 
-def parse_filename(stem: str) -> Tuple[str | None, int | None, str | None]:
+def parse_filename(stem: str) -> Tuple[str | None, str | None]:
     """
-    Parse file name of form: safe-name_age_gender_index
-    Example: mr-beast_29_male_1  -> ("Mr Beast", 29, "male")
-    If pattern doesn't match, returns (None, None, None).
+    Parse file name of form: safe-name_gender_index
+    Example: mr-beast_male_1  -> ("Mr Beast", "male")
+
+    If pattern doesn't match, returns (None, None).
     """
     parts = stem.split("_")
-    if len(parts) < 3:
-        return None, None, None
+    if len(parts) < 2:
+        return None, None
 
     raw_name = parts[0]  # "mr-beast"
     # convert to display name "Mr Beast"
     name = raw_name.replace("-", " ").title()
 
-    age = None
-    try:
-        age = int(parts[1])
-    except Exception:
-        age = None
-
-    gender = parts[2].lower()
-    return name, age, gender
+    gender = parts[1].lower()
+    return name, gender
 
 
 class RecognizerDeepFace:
@@ -41,14 +36,14 @@ class RecognizerDeepFace:
 
         faces_db/
           mr-beast/
-            mr-beast_29_male_1.jpg
-            mr-beast_29_male_2.jpg
+            mr-beast_male_1.jpg
+            mr-beast_male_2.jpg
           tom-cruise/
-            tom-cruise_62_male_1.jpg
+            tom-cruise_male_1.jpg
 
     - Uses DeepFace.represent(model_name=...) to compute embeddings
     - `infer()` finds the closest embedding and returns (name, distance)
-    - `get_profile(name)` returns stored age/gender (from filenames)
+    - `get_profile(name)` returns stored gender (from filenames)
     """
 
     def __init__(
@@ -65,7 +60,7 @@ class RecognizerDeepFace:
 
         self.embeddings: List[np.ndarray] = []
         self.labels: List[str] = []  # display names
-        self.person_meta: Dict[str, Dict[str, Any]] = {}  # name -> {age, gender}
+        self.person_meta: Dict[str, Dict[str, Any]] = {}  # name -> {"gender": str | None}
 
         self._load_db()
 
@@ -86,8 +81,8 @@ class RecognizerDeepFace:
             if img is None:
                 continue
 
-            # Parse name/age/gender from filename if possible
-            name, age, gender = parse_filename(file.stem)
+            # Parse name/gender from filename if possible
+            name, gender = parse_filename(file.stem)
 
             # If parsing failed, fall back to folder name or file stem
             if name is None:
@@ -98,9 +93,7 @@ class RecognizerDeepFace:
 
             # Store meta if we got it
             if name not in self.person_meta:
-                self.person_meta[name] = {"age": None, "gender": None}
-            if age is not None:
-                self.person_meta[name]["age"] = age
+                self.person_meta[name] = {"gender": None}
             if gender is not None:
                 self.person_meta[name]["gender"] = gender
 
@@ -170,6 +163,6 @@ class RecognizerDeepFace:
     def get_profile(self, name: str) -> Dict[str, Any]:
         """
         Returns stored metadata for a person:
-            {"age": int | None, "gender": str | None}
+            {"gender": str | None}
         """
         return self.person_meta.get(name, {})
