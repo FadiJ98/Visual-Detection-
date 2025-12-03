@@ -200,13 +200,11 @@ COLOR_PALETTE: List[tuple[str, tuple[int, int, int]]] = [
 ]
 
 
-# ---------- CACHED RECOGNIZER ----------
+# ---------- CACHED RECOGNIZER (LAZY) ----------
 @st.cache_resource
-def load_recognizer() -> RecognizerDeepFace:
+def get_recognizer() -> RecognizerDeepFace:
+    # This will only be created the first time it's called
     return RecognizerDeepFace(model_name="Facenet512")
-
-
-recognizer = load_recognizer()
 
 
 # ---------- COMMON: TOP NAV BAR (HOME + BACK) ----------
@@ -449,6 +447,9 @@ def page_loading() -> None:
             face_infos.sort(key=lambda f: (f["cy"], f["cx"]))
 
             results_table: List[Dict[str, Any]] = []
+
+            # ---- get recognizer lazily here ----
+            recognizer = get_recognizer()
 
             # --- Draw colored boxes + build table ---
             for idx, info in enumerate(face_infos, start=1):
