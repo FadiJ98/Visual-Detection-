@@ -289,12 +289,10 @@ def page_upload():
     def start_detection():
         if img_file is None:
             return
-        # store image bytes in session state for loading page
         st.session_state.uploaded_image_bytes = img_file.getvalue()
         st.session_state.pending_detection = True
         go_loading()
 
-    # Detect button using callback
     st.button(
         "Detect",
         type="primary",
@@ -382,7 +380,6 @@ def page_loading():
                     }
                 )
 
-            # Sort by vertical then horizontal position
             face_infos.sort(key=lambda f: (f["cy"], f["cx"]))
 
             results_table: List[Dict[str, Any]] = []
@@ -394,23 +391,18 @@ def page_loading():
 
                 face = bgr[y1:y2, x1:x2]
 
-                # DeepFace attributes
                 emotion = r.get("dominant_emotion", "unknown")
 
-                # Gender may be dict like {"Man": x, "Woman": y} or a string
                 raw_gender = r.get("gender") or r.get("dominant_gender")
                 if isinstance(raw_gender, dict) and raw_gender:
                     gender = max(raw_gender, key=raw_gender.get)
                 else:
                     gender = raw_gender if raw_gender else "Unknown"
 
-                # Recognition (name only)
                 name, dist = recognizer.infer(face)
 
-                # Pick color from palette
                 color_name, color_bgr = COLOR_PALETTE[(idx - 1) % len(COLOR_PALETTE)]
 
-                # Draw only the colored rectangle (no label text)
                 cv2.rectangle(annotated, (x1, y1), (x2, y2), color_bgr, 3)
 
                 results_table.append(
@@ -426,10 +418,13 @@ def page_loading():
             st.session_state.annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
             st.session_state.results_table = results_table
 
-            # done
             st.session_state.pending_detection = False
             go_results()
-            st.experimental_rerun()
+
+            if hasattr(st, "rerun"):
+                st.rerun()
+            elif hasattr(st, "experimental_rerun"):
+                st.experimental_rerun()
 
 
 # ---------- PAGE: RESULTS ----------
