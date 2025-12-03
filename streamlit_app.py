@@ -115,6 +115,41 @@ def distance_to_range(dist: float) -> str:
         return "Very far"
 
 
+# ---------- COLOR PALETTE (name, BGR) ----------
+COLOR_PALETTE: List[tuple[str, tuple[int, int, int]]] = [
+    ("Blue",       (255,  80,  20)),
+    ("Green",      ( 80, 220,  80)),
+    ("Orange",     ( 40, 140, 255)),
+    ("Yellow",     ( 40, 230, 255)),
+    ("Purple",     (200,  80, 200)),
+    ("Brown",      ( 40,  60, 140)),
+    ("Gray",       (160, 160, 160)),
+    ("Red",        ( 40,  40, 255)),
+    ("Olive",      ( 60, 120,  60)),
+    ("Maroon",     ( 40,  40, 140)),
+    ("Violet",     (230, 130, 230)),
+    ("Charcoal",   ( 60,  60,  60)),
+    ("Magenta",    (230,  80, 230)),
+    ("Bronze",     ( 60, 120, 200)),
+    ("Cream",      (210, 220, 230)),
+    ("Tan",        (140, 180, 220)),
+    ("Teal",       (140, 200, 140)),
+    ("Black",      (  0,   0,   0)),
+    ("Mustard",    ( 60, 200, 220)),
+    ("Navy Blue",  (180,  60,  40)),
+    ("Coral",      (120, 160, 255)),
+    ("Burgundy",   ( 40,  40, 110)),
+    ("Lavender",   (220, 200, 250)),
+    ("Mauve",      (200, 180, 220)),
+    ("Peach",      (180, 200, 240)),
+    ("Rust",       ( 60,  80, 160)),
+    ("Gold",       ( 40, 200, 255)),
+    ("Pink",       (220, 180, 250)),
+    ("Silver",     (200, 200, 200)),
+    ("Cyan",       (250, 220,  80)),
+]
+
+
 # ---------- CACHED RECOGNIZER ----------
 @st.cache_resource
 def load_recognizer() -> RecognizerDeepFace:
@@ -275,13 +310,13 @@ def page_upload():
             st.error(f"DeepFace error: {e}")
             return
 
-        faces = result if isinstance(result, list) else [result]
+        faces_raw = result if isinstance(result, list) else [result]
         annotated = bgr.copy()
         h, w = bgr.shape[:2]
 
-        results_table: List[Dict[str, Any]] = []
-
-        for idx, r in enumerate(faces, start=1):
+        # --- Build sortable list of faces (top->bottom, left->right) ---
+        face_infos: List[Dict[str, Any]] = []
+        for r in faces_raw:
             region = r.get("region") or {}
             x = int(region.get("x", 0))
             y = int(region.get("y", 0))
@@ -296,22 +331,68 @@ def page_upload():
             if x2 <= x1 or y2 <= y1:
                 continue
 
+            cx = (x1 + x2) / 2.0
+            cy = (y1 + y2) / 2.0
+
+            face_infos.append(
+                {
+                    "r": r,
+                    "x1": x1,
+                    "y1": y1,
+                    "x2": x2,
+                    "y2": y2,
+                    "cx": cx,
+                    "cy": cy,
+                }
+            )
+
+        # Sort by vertical then horizontal position
+        face_infos.sort(key=lambda f: (f["cy"], f["cx"]))
+
+        results_table: List[Dict[str, Any]] = []
+
+        # --- Draw colored boxes + build table ---
+        for idx, info in enumerate(face_infos, start=1):
+            r = info["r"]
+            x1, y1, x2, y2 = info["x1"], info["y1"], info["x2"], info["y2"]
+
             face = bgr[y1:y2, x1:x2]
             emotion = r.get("dominant_emotion", "unknown")
 
+            # Recognition + range
             name, dist = recognizer.infer(face)
             range_label = distance_to_range(float(dist))
 
+            # Pick color from palette
+            color_name, color_bgr = COLOR_PALETTE[(idx - 1) % len(COLOR_PALETTE)]
+
             label = emotion if name == "Unknown" else f"{name} | {emotion}"
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            y_text = max(15, y1 - 10)
+
+            # Rectangle in that color
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), color_bgr, 3)
+
+            # Optional: colored label background
+            label_bg_y2 = max(0, y1 - 5)
+            label_bg_y1 = max(0, label_bg_y2 - 25)
+            cv2.rectangle(
+                annotated,
+                (x1, label_bg_y1),
+                (x2, label_bg_y2),
+                color_bgr,
+                thickness=-1,
+            )
+
+            # Label text in black/white depending on brightness
+            brightness = 0.299 * color_bgr[2] + 0.587 * color_bgr[1] + 0.114 * color_bgr[0]
+            text_color = (0, 0, 0) if brightness > 150 else (255, 255, 255)
+
             cv2.putText(
                 annotated,
                 label,
-                (x1, y_text),
+                (x1 + 4, label_bg_y2 - 7),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,
-                (0, 255, 0),
+                text_color,
                 2,
                 lineType=cv2.LINE_AA,
             )
@@ -322,6 +403,7 @@ def page_upload():
                     "Name": name,
                     "Range": range_label,
                     "Emotion": emotion,
+                    "Color": color_name,
                 }
             )
 
@@ -347,7 +429,7 @@ def page_results():
         <div class='fade-in fade-1' style='padding-top:20px;'>
             <h2>Detection Results</h2>
             <p style='color:#aaaaaa;'>
-                Review the detected faces, emotions, and identity ranges.
+                Review the detected faces, emotions, ranges, and colors.
             </p>
         </div>
         """,
