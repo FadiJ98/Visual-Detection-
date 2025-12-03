@@ -366,36 +366,8 @@ def page_upload():
             # Pick color from palette
             color_name, color_bgr = COLOR_PALETTE[(idx - 1) % len(COLOR_PALETTE)]
 
-            label = emotion if name == "Unknown" else f"{name} | {emotion}"
-
-            # Rectangle in that color
+            # Draw only the colored rectangle (no label text)
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color_bgr, 3)
-
-            # Optional: colored label background
-            label_bg_y2 = max(0, y1 - 5)
-            label_bg_y1 = max(0, label_bg_y2 - 25)
-            cv2.rectangle(
-                annotated,
-                (x1, label_bg_y1),
-                (x2, label_bg_y2),
-                color_bgr,
-                thickness=-1,
-            )
-
-            # Label text in black/white depending on brightness
-            brightness = 0.299 * color_bgr[2] + 0.587 * color_bgr[1] + 0.114 * color_bgr[0]
-            text_color = (0, 0, 0) if brightness > 150 else (255, 255, 255)
-
-            cv2.putText(
-                annotated,
-                label,
-                (x1 + 4, label_bg_y2 - 7),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                text_color,
-                2,
-                lineType=cv2.LINE_AA,
-            )
 
             results_table.append(
                 {
