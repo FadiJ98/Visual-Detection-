@@ -1,23 +1,62 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 
 import cv2
 import numpy as np
 from deepface import DeepFace
 
 
+def parse_filename(stem: str) -> Tuple[str | None, int | None, str | None]:
+    """
+    Parse file name of form: safe-name_age_gender_index
+    Example: mr-beast_29_male_1  -> ("Mr Beast", 29, "male")
+    If pattern doesn't match, returns (None, None, None).
+    """
+    parts = stem.split("_")
+    if len(parts) < 3:
+        return None, None, None
+
+    raw_name = parts[0]  # "mr-beast"
+    # convert to display name "Mr Beast"
+    name = raw_name.replace("-", " ").title()
+
+    age = None
+    try:
+        age = int(parts[1])
+    except Exception:
+        age = None
+
+    gender = parts[2].lower()
+    return name, age, gender
+
+
 class RecognizerDeepFace:
     """
     Simple DeepFace-based face recognizer.
 
-    - Loads one image per identity from `db_path`
+    - Looks inside `db_path`
+    - Accepts nested folders, e.g.:
+
+        faces_db/
+          mr-beast/
+            mr-beast_29_male_1.jpg
+            mr-beast_29_male_2.jpg
+          tom-cruise/
+            tom-cruise_62_male_1.jpg
+
     - Uses DeepFace.represent(model_name=...) to compute embeddings
     - `infer()` finds the closest embedding and returns (name, distance)
+    - `get_profile(name)` returns stored age/gender (from filenames)
     """
 
-    def __init__(self, model_name: str = "Facenet512", db_path: str = "faces_db", threshold: float = 1.0) -> None:
+    def __init__(
+        self,
+        model_name: str = "Facenet512",
+        db_path: str = "faces_db",
+        threshold: float = 1.0,
+    ) -> None:
         self.model_name = model_name
         self.db_path = Path(db_path)
         self.threshold = threshold
@@ -25,20 +64,45 @@ class RecognizerDeepFace:
         self.db_path.mkdir(parents=True, exist_ok=True)
 
         self.embeddings: List[np.ndarray] = []
-        self.labels: List[str] = []
+        self.labels: List[str] = []  # display names
+        self.person_meta: Dict[str, Dict[str, Any]] = {}  # name -> {age, gender}
 
         self._load_db()
 
     # ----------------- LOAD DB -----------------
     def _load_db(self) -> None:
         """Load all face images in db_path and compute embeddings."""
-        for file in self.db_path.iterdir():
-            if file.suffix.lower() not in {".jpg", ".jpeg", ".png"}:
+        self.embeddings.clear()
+        self.labels.clear()
+        self.person_meta.clear()
+
+        exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
+        for file in self.db_path.rglob("*"):
+            if not file.is_file() or file.suffix.lower() not in exts:
                 continue
 
             img = cv2.imread(str(file))
             if img is None:
                 continue
+
+            # Parse name/age/gender from filename if possible
+            name, age, gender = parse_filename(file.stem)
+
+            # If parsing failed, fall back to folder name or file stem
+            if name is None:
+                if file.parent != self.db_path:
+                    name = file.parent.name
+                else:
+                    name = file.stem
+
+            # Store meta if we got it
+            if name not in self.person_meta:
+                self.person_meta[name] = {"age": None, "gender": None}
+            if age is not None:
+                self.person_meta[name]["age"] = age
+            if gender is not None:
+                self.person_meta[name]["gender"] = gender
 
             try:
                 rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -52,10 +116,14 @@ class RecognizerDeepFace:
 
                 vec = np.array(rep["embedding"], dtype="float32")
                 self.embeddings.append(vec)
-                self.labels.append(file.stem)
+                self.labels.append(name)
             except Exception:
                 # Skip any images that cause errors
                 continue
+
+    # Allow manual reload after new faces are added
+    def reload(self) -> None:
+        self._load_db()
 
     # ----------------- EMBED FACE -----------------
     def embed(self, face_bgr: np.ndarray) -> np.ndarray:
@@ -97,3 +165,11 @@ class RecognizerDeepFace:
             return "Unknown", best_dist
 
         return best_name, best_dist
+
+    # ----------------- PROFILE LOOKUP -----------------
+    def get_profile(self, name: str) -> Dict[str, Any]:
+        """
+        Returns stored metadata for a person:
+            {"age": int | None, "gender": str | None}
+        """
+        return self.person_meta.get(name, {})
