@@ -1,3 +1,4 @@
+#import
 import streamlit as st
 
 BG_GIF = "https://mir-s3-cdn-cf.behance.net/project_modules/disp/9c0722106004343.5f85fead2894a.gif"
