@@ -448,15 +448,23 @@ def page_loading():
 
                 face = bgr[y1:y2, x1:x2]
 
+                # emotion from DeepFace
                 emotion = r.get("dominant_emotion", "unknown")
 
+                # gender from DeepFace
                 raw_gender = r.get("gender") or r.get("dominant_gender")
                 if isinstance(raw_gender, dict) and raw_gender:
                     gender = max(raw_gender, key=raw_gender.get)
                 else:
                     gender = raw_gender if raw_gender else "Unknown"
 
+                # name from recognizer
                 name, dist = recognizer.infer(face)
+
+                # age from filename (via recognizer metadata)
+                profile = recognizer.get_profile(name)
+                age_val = profile.get("age") if profile else None
+                age_display = age_val if age_val is not None else "Unknown"
 
                 color_name, color_bgr = COLOR_PALETTE[(idx - 1) % len(COLOR_PALETTE)]
 
@@ -467,6 +475,7 @@ def page_loading():
                         "Face #": idx,
                         "Color": color_name,
                         "Name": name,
+                        "Age": age_display,
                         "Gender": gender,
                         "Emotion": emotion,
                     }
@@ -495,7 +504,7 @@ def page_results():
         <div class='fade-in fade-1' style='padding-top:20px;'>
             <h2 style="color:#ffffff;">Detection Results</h2>
             <p style='color:#aaaaaa;'>
-                Review the detected faces, genders, emotions, and colors.
+                Review the detected faces, ages, genders, emotions, and colors.
             </p>
         </div>
         """,
