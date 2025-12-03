@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import List, Dict, Any
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -98,8 +97,7 @@ def set_black_background() -> None:
 
 # ---------- SESSION STATE SETUP ----------
 if "page" not in st.session_state:
-    # welcome, settings, upload, loading, results, register
-    st.session_state.page = "welcome"
+    st.session_state.page = "welcome"   # welcome, settings, upload, loading, results
 
 if "detector_backend" not in st.session_state:
     st.session_state.detector_backend = None
@@ -147,10 +145,6 @@ def go_results():
 
 def go_loading():
     st.session_state.page = "loading"
-
-
-def go_register():
-    st.session_state.page = "register"
 
 
 def choose_opencv():
@@ -213,38 +207,6 @@ def load_recognizer() -> RecognizerDeepFace:
 
 
 recognizer = load_recognizer()
-
-
-# ---------- SAVE REGISTERED FACE ----------
-def save_registered_face(name: str, gender: str, uploaded_file) -> str:
-    """
-    Save uploaded face into faces_db/<safe_name>/safe-name_gender_index.ext
-    Returns the full path as string.
-    """
-    faces_root = Path("faces_db")
-    faces_root.mkdir(exist_ok=True)
-
-    # safe-name: "Mr Beast" -> "mr-beast"
-    safe_name = name.strip().replace(" ", "-").lower()
-    person_dir = faces_root / safe_name
-    person_dir.mkdir(exist_ok=True)
-
-    ext = Path(uploaded_file.name).suffix.lower() or ".jpg"
-
-    # count existing files for this person
-    existing = list(person_dir.glob(f"{safe_name}_*_*{ext}"))
-    idx = len(existing) + 1
-
-    filename = f"{safe_name}_{gender.lower()}_{idx}{ext}"
-    out_path = person_dir / filename
-
-    file_bytes = np.frombuffer(uploaded_file.getvalue(), np.uint8)
-    img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-    if img is None:
-        raise ValueError("Could not read uploaded image")
-
-    cv2.imwrite(str(out_path), img)
-    return str(out_path)
 
 
 # ---------- COMMON: TOP NAV BAR (HOME + BACK) ----------
@@ -342,61 +304,6 @@ def page_settings():
             f"</p>",
             unsafe_allow_html=True,
         )
-
-    st.markdown("---")
-    st.markdown(
-        "<p style='text-align:center; color:#dddddd;'>"
-        "Want the app to recognize you or someone else?</p>",
-        unsafe_allow_html=True,
-    )
-    center = st.columns(3)[1]
-    with center:
-        st.button(
-            "Register a New Face",
-            use_container_width=True,
-            on_click=go_register,
-        )
-
-
-# ---------- PAGE: REGISTER ----------
-def page_register():
-    set_background(True)
-    top_nav()  # Home only
-
-    st.markdown(
-        """
-        <div class='fade-in fade-1' style='text-align:center; padding-top:40px;'>
-            <h2 style="color:#ffffff;">Register a New Face</h2>
-            <p style='color:#dddddd; max-width:600px; margin:10px auto 0 auto;'>
-                Upload a face image and enter name and gender.
-                The system will save it so future photos can be recognized.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    with st.form("register_face_form"):
-        name = st.text_input("Name *", help="e.g., Tom Cruise, Mr Beast")
-        gender = st.selectbox("Gender *", ["male", "female", "other"])
-        uploaded = st.file_uploader(
-            "Upload a face image *",
-            type=["jpg", "jpeg", "png", "bmp", "webp"],
-        )
-        submitted = st.form_submit_button("Save to database")
-
-    if submitted:
-        if not name or uploaded is None:
-            st.error("Please provide a name and an image.")
-            return
-
-        try:
-            path = save_registered_face(name, gender, uploaded)
-            # reload recognizer so it sees the new face
-            recognizer.reload()
-            st.success(f"Saved face for **{name}** at `{path}` and reloaded database.")
-        except Exception as e:
-            st.error(f"Error saving face: {e}")
 
 
 # ---------- PAGE: UPLOAD ----------
@@ -543,24 +450,13 @@ def page_loading():
 
                 emotion = r.get("dominant_emotion", "unknown")
 
-                # DeepFace gender prediction
                 raw_gender = r.get("gender") or r.get("dominant_gender")
                 if isinstance(raw_gender, dict) and raw_gender:
-                    gender_pred = max(raw_gender, key=raw_gender.get)
+                    gender = max(raw_gender, key=raw_gender.get)
                 else:
-                    gender_pred = raw_gender if raw_gender else "Unknown"
+                    gender = raw_gender if raw_gender else "Unknown"
 
-                # Recognition
                 name, dist = recognizer.infer(face)
-
-                # Stored profile (from filename) if any
-                profile = recognizer.get_profile(name)
-                gender_meta = profile.get("gender")
-
-                if name == "Unknown":
-                    gender_final = gender_pred
-                else:
-                    gender_final = gender_meta if gender_meta is not None else gender_pred
 
                 color_name, color_bgr = COLOR_PALETTE[(idx - 1) % len(COLOR_PALETTE)]
 
@@ -571,7 +467,7 @@ def page_loading():
                         "Face #": idx,
                         "Color": color_name,
                         "Name": name,
-                        "Gender": gender_final,
+                        "Gender": gender,
                         "Emotion": emotion,
                     }
                 )
@@ -599,7 +495,7 @@ def page_results():
         <div class='fade-in fade-1' style='padding-top:20px;'>
             <h2 style="color:#ffffff;">Detection Results</h2>
             <p style='color:#aaaaaa;'>
-                Review the detected faces, names, genders, and emotions.
+                Review the detected faces, genders, emotions, and colors.
             </p>
         </div>
         """,
@@ -632,5 +528,3 @@ elif st.session_state.page == "loading":
     page_loading()
 elif st.session_state.page == "results":
     page_results()
-elif st.session_state.page == "register":
-    page_register()
