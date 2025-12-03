@@ -201,9 +201,10 @@ COLOR_PALETTE: List[tuple[str, tuple[int, int, int]]] = [
 
 
 # ---------- CACHED RECOGNIZER ----------
-#@st.cache_resource
-def load_recognizer() -> RecognizerDeepFace:
-    return RecognizerDeepFace(model_name="Facenet512")
+recognizer = RecognizerDeepFace(
+    db_path="faces_db",   # folder with all your labeled faces
+    threshold=2000.0,     # you can tune this later if needed
+)
 
 
 recognizer = load_recognizer()
