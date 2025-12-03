@@ -13,7 +13,7 @@ from recognition_deepface import RecognizerDeepFace
 # ---------- STREAMLIT PAGE CONFIG ----------
 st.set_page_config(page_title="Visual Detection (DeepFace)", layout="wide")
 
-# ---------- GLOBAL CSS (animations, dots) ----------
+# ---------- GLOBAL CSS (animations, dots, background helper) ----------
 st.markdown(
     """
     <style>
@@ -38,6 +38,16 @@ st.markdown(
     .typing-dots::after {
         content: '';
         animation: dotsBlink 1.2s steps(4, end) infinite;
+    }
+
+    /* Background wrapper for pages that should have the GIF */
+    .app-bg {
+        min-height: 100vh;
+        padding: 0 24px 24px 24px;
+        background-image: url("https://mir-s3-cdn-cf.behance.net/project_modules/disp/9c0722106004343.5f85fead2894a.gif");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
     }
     </style>
     """,
@@ -161,17 +171,20 @@ recognizer = load_recognizer()
 
 # ---------- PAGE: WELCOME ----------
 def page_welcome():
+    # background wrapper start
+    st.markdown('<div class="app-bg">', unsafe_allow_html=True)
+
     st.markdown(
         """
         <div style='text-align:center; padding-top:80px;'>
             <h1 class='fade-in fade-1' style='font-size:48px; font-weight:700;'>
                 Welcome to Visual Detection
             </h1>
-            <h3 class='fade-in fade-2' style='color:#aaaaaa; margin-top:-10px; font-size:18px;'>
+            <h3 class='fade-in fade-2' style='color:#eeeeee; margin-top:-10px; font-size:18px;'>
                 Using DeepFace for face analysis
             </h3>
             <p class='fade-in fade-3 typing-dots'
-               style='font-size:20px; margin-top:30px; max-width:600px; margin-left:auto; margin-right:auto;'>
+               style='font-size:20px; margin-top:30px; max-width:600px; margin-left:auto; margin-right:auto; color:#ffffff;'>
                 Press <strong>Start</strong> to upload an image and unfold true identities
             </p>
         </div>
@@ -187,6 +200,9 @@ def page_welcome():
             use_container_width=True,
             on_click=go_settings,
         )
+
+    # background wrapper end
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ---------- COMMON: TOP NAV BAR (HOME + BACK) ----------
@@ -206,13 +222,16 @@ def top_nav(show_back_to=None):
 
 # ---------- PAGE: SETTINGS ----------
 def page_settings():
+    # background wrapper start
+    st.markdown('<div class="app-bg">', unsafe_allow_html=True)
+
     top_nav()  # Home only
 
     st.markdown(
         """
         <div class='fade-in fade-1' style='text-align:center; padding-top:40px;'>
-            <h2>Select a detection backend</h2>
-            <p style='color:#aaaaaa; max-width:600px; margin:10px auto 30px auto;'>
+            <h2 style="color:#ffffff;">Select a detection backend</h2>
+            <p style='color:#dddddd; max-width:600px; margin:10px auto 30px auto;'>
                 Choose how faces are detected before emotion and identity analysis.
             </p>
         </div>
@@ -224,8 +243,8 @@ def page_settings():
     with col1:
         st.markdown(
             "<div class='fade-in fade-2' style='text-align:center;'>"
-            "<h3>OpenCV</h3>"
-            "<p style='color:#bbbbbb;'>Fast, classic Haar-based detection.</p>"
+            "<h3 style='color:#ffffff;'>OpenCV</h3>"
+            "<p style='color:#dddddd;'>Fast, classic Haar-based detection.</p>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -235,8 +254,8 @@ def page_settings():
     with col2:
         st.markdown(
             "<div class='fade-in fade-3' style='text-align:center;'>"
-            "<h3>RetinaFace</h3>"
-            "<p style='color:#bbbbbb;'>More accurate modern deep-learning detector.</p>"
+            "<h3 style='color:#ffffff;'>RetinaFace</h3>"
+            "<p style='color:#dddddd;'>More accurate modern deep-learning detector.</p>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -245,22 +264,28 @@ def page_settings():
 
     if st.session_state.detector_backend:
         st.markdown(
-            f"<p style='text-align:center; margin-top:30px; color:#888;'>"
+            f"<p style='text-align:center; margin-top:30px; color:#e0e0e0;'>"
             f"Current selection: <strong>{st.session_state.detector_backend}</strong>"
             f"</p>",
             unsafe_allow_html=True,
         )
 
+    # background wrapper end
+    st.markdown("</div>", unsafe_allow_html=True)
+
 
 # ---------- PAGE: UPLOAD ----------
 def page_upload():
+    # background wrapper start
+    st.markdown('<div class="app-bg">', unsafe_allow_html=True)
+
     top_nav(show_back_to="settings")  # Home + Back to Settings
 
     st.markdown(
         """
         <div class='fade-in fade-1' style='padding-top:20px;'>
-            <h2>Upload an image</h2>
-            <p style='color:#aaaaaa;'>
+            <h2 style="color:#ffffff;">Upload an image</h2>
+            <p style='color:#dddddd;'>
                 Choose a photo and run detection with your selected backend.
             </p>
         </div>
@@ -270,6 +295,7 @@ def page_upload():
 
     if not st.session_state.detector_backend:
         st.error("Please choose a detector on the Settings page first.")
+        st.markdown("</div>", unsafe_allow_html=True)
         return
 
     # Reset image button
@@ -300,18 +326,21 @@ def page_upload():
         on_click=start_detection,
     )
 
+    # background wrapper end
+    st.markdown("</div>", unsafe_allow_html=True)
+
 
 # ---------- PAGE: LOADING (GIF + ANALYSIS) ----------
 def page_loading():
     top_nav()  # just Home
 
-    # Centered GIF (2x bigger)
+    # Centered GIF (2x size)
     st.markdown(
         """
         <div style="display:flex; justify-content:center; align-items:center; height:80vh;">
           <div style="text-align:center;">
             <img src="https://miro.medium.com/v2/1*4Tr0FOsdUgkF32T3mdu6pg.gif"
-                 style="width:720px; max-width:90vw; border-radius:20px;"/>
+                 style="width:760px; max-width:90vw; border-radius:20px;"/>
           </div>
         </div>
         """,
