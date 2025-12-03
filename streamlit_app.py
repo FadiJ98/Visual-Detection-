@@ -120,7 +120,7 @@ if "pending_detection" not in st.session_state:
 
 
 # ---------- CALLBACK HELPERS ----------
-def reset_all():
+def reset_all() -> None:
     """Reset everything and go back to welcome."""
     st.session_state.page = "welcome"
     st.session_state.detector_backend = None
@@ -131,33 +131,33 @@ def reset_all():
     st.session_state.pending_detection = False
 
 
-def go_settings():
+def go_settings() -> None:
     st.session_state.page = "settings"
 
 
-def go_upload():
+def go_upload() -> None:
     st.session_state.page = "upload"
 
 
-def go_results():
+def go_results() -> None:
     st.session_state.page = "results"
 
 
-def go_loading():
+def go_loading() -> None:
     st.session_state.page = "loading"
 
 
-def choose_opencv():
+def choose_opencv() -> None:
     st.session_state.detector_backend = "opencv"
     st.session_state.page = "upload"
 
 
-def choose_retina():
+def choose_retina() -> None:
     st.session_state.detector_backend = "retinaface"
     st.session_state.page = "upload"
 
 
-def reset_image():
+def reset_image() -> None:
     st.session_state.upload_key += 1
     st.session_state.results_table = []
     st.session_state.annotated_rgb = None
@@ -200,18 +200,21 @@ COLOR_PALETTE: List[tuple[str, tuple[int, int, int]]] = [
 ]
 
 
-# ---------- CACHED RECOGNIZER ----------
+# ---------- CACHED RECOGNIZER (LAZY-LOADED) ----------
 @st.cache_resource
-def load_recognizer() -> RecognizerDeepFace:
+def get_recognizer() -> RecognizerDeepFace:
+    """
+    Lazily create and cache the RecognizerDeepFace instance.
+
+    This avoids loading Facenet512 + DB at import time, which is heavy
+    in constrained environments like Streamlit Cloud.
+    """
     return RecognizerDeepFace(model_name="Facenet512")
 
 
-recognizer = load_recognizer()
-
-
 # ---------- COMMON: TOP NAV BAR (HOME + BACK) ----------
-def top_nav(show_back_to=None):
-    """show_back_to: None, 'settings', or 'upload' """
+def top_nav(show_back_to: str | None = None) -> None:
+    """show_back_to: None, 'settings', or 'upload'."""
     cols = st.columns([1, 1, 6])
     with cols[0]:
         st.button("Home", key=f"home_{st.session_state.page}", on_click=reset_all)
@@ -225,7 +228,7 @@ def top_nav(show_back_to=None):
 
 
 # ---------- PAGE: WELCOME ----------
-def page_welcome():
+def page_welcome() -> None:
     set_background(True)
 
     st.markdown(
@@ -246,7 +249,7 @@ def page_welcome():
         unsafe_allow_html=True,
     )
 
-    col1, col2, col3 = st.columns([1, 1, 1])
+    _, col2, _ = st.columns([1, 1, 1])
     with col2:
         st.button(
             "Start",
@@ -257,7 +260,7 @@ def page_welcome():
 
 
 # ---------- PAGE: SETTINGS ----------
-def page_settings():
+def page_settings() -> None:
     set_background(True)
 
     top_nav()  # Home only
@@ -283,8 +286,12 @@ def page_settings():
             "</div>",
             unsafe_allow_html=True,
         )
-        st.button("Use OpenCV", key="btn_opencv", use_container_width=True,
-                  on_click=choose_opencv)
+        st.button(
+            "Use OpenCV",
+            key="btn_opencv",
+            use_container_width=True,
+            on_click=choose_opencv,
+        )
 
     with col2:
         st.markdown(
@@ -294,8 +301,12 @@ def page_settings():
             "</div>",
             unsafe_allow_html=True,
         )
-        st.button("Use RetinaFace", key="btn_retina", use_container_width=True,
-                  on_click=choose_retina)
+        st.button(
+            "Use RetinaFace",
+            key="btn_retina",
+            use_container_width=True,
+            on_click=choose_retina,
+        )
 
     if st.session_state.detector_backend:
         st.markdown(
@@ -307,7 +318,7 @@ def page_settings():
 
 
 # ---------- PAGE: UPLOAD ----------
-def page_upload():
+def page_upload() -> None:
     set_background(True)
 
     top_nav(show_back_to="settings")  # Home + Back to Settings
@@ -342,7 +353,7 @@ def page_upload():
     )
 
     # ---------- START DETECTION (NAVIGATE TO LOADING PAGE) ----------
-    def start_detection():
+    def start_detection() -> None:
         if img_file is None:
             return
         st.session_state.uploaded_image_bytes = img_file.getvalue()
@@ -358,7 +369,7 @@ def page_upload():
 
 
 # ---------- PAGE: LOADING (GIF + ANALYSIS) ----------
-def page_loading():
+def page_loading() -> None:
     set_black_background()
     top_nav()  # just Home
 
@@ -442,6 +453,9 @@ def page_loading():
             results_table: List[Dict[str, Any]] = []
 
             # --- Draw colored boxes + build table ---
+            # Lazy-load recognizer here (heavy object, cached via @st.cache_resource)
+            recognizer = get_recognizer()
+
             for idx, info in enumerate(face_infos, start=1):
                 r = info["r"]
                 x1, y1, x2, y2 = info["x1"], info["y1"], info["x2"], info["y2"]
@@ -485,7 +499,7 @@ def page_loading():
 
 
 # ---------- PAGE: RESULTS ----------
-def page_results():
+def page_results() -> None:
     set_black_background()
 
     top_nav(show_back_to="upload")  # Home + Back to Image Upload
@@ -510,7 +524,7 @@ def page_results():
 
     with col_left:
         st.subheader("Annotated image")
-        st.image(st.session_state.annotated_rgb, channels="RGB", use_column_width=True)
+        st.image(st.session_state.annotated_rgb, channels="RGB", use_container_width=True)
 
     with col_right:
         st.subheader("Analysis")
