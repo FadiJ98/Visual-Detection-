@@ -10,9 +10,11 @@ from deepface import DeepFace
 
 def parse_filename(stem: str) -> Tuple[str | None, int | None]:
     """
-    Expected pattern:  safe-name_age_index
-    Example:          tom-cruise_24_1
-                      ^name       ^age
+    Expected pattern: safe-name_age_index
+
+    Examples:
+        tom-cruise_24_1  ->  name='Tom Cruise', age=24
+        mr-beast_29_3    ->  name='Mr Beast',   age=29
 
     Returns:
         (display_name, age) or (None, None) if pattern not matched.
@@ -21,7 +23,7 @@ def parse_filename(stem: str) -> Tuple[str | None, int | None]:
     if len(parts) < 2:
         return None, None
 
-    raw_name = parts[0]           # "tom-cruise"
+    raw_name = parts[0]            # "tom-cruise"
     name = raw_name.replace("-", " ").title()  # -> "Tom Cruise"
 
     age = None
@@ -37,7 +39,7 @@ class RecognizerDeepFace:
     """
     Simple DeepFace-based face recognizer.
 
-    - Loads images from `db_path` (also inside subfolders)
+    - Loads images from `db_path` (including subfolders)
     - Uses DeepFace.represent(model_name=...) to compute embeddings
     - `infer()` finds the closest embedding and returns (name, distance)
     - Filenames can encode metadata: safe-name_age_index
@@ -57,7 +59,8 @@ class RecognizerDeepFace:
 
         self.embeddings: List[np.ndarray] = []
         self.labels: List[str] = []  # display names
-        self.person_meta: Dict[str, Dict[str, Any]] = {}  # name -> {"age": int | None}
+        # name -> {"age": int | None}
+        self.person_meta: Dict[str, Dict[str, Any]] = {}
 
         self._load_db()
 
@@ -70,7 +73,7 @@ class RecognizerDeepFace:
 
         valid_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
-        # supports subfolders under faces_db
+        # support subfolders under faces_db
         for file in self.db_path.rglob("*"):
             if not file.is_file() or file.suffix.lower() not in valid_exts:
                 continue
@@ -79,14 +82,13 @@ class RecognizerDeepFace:
             if img is None:
                 continue
 
-            # try to parse from filename
+            # parse from filename
             display_name, age = parse_filename(file.stem)
-
-            # fallback if pattern not respected
             if display_name is None:
+                # fallback: raw stem
                 display_name = file.stem
 
-            # store age metadata if available
+            # init metadata for this name
             if display_name not in self.person_meta:
                 self.person_meta[display_name] = {"age": None}
             if age is not None:
@@ -131,7 +133,6 @@ class RecognizerDeepFace:
         if face_bgr is None or face_bgr.size == 0:
             return "Unknown", 999.0
 
-        # No database, nothing to match
         if not self.embeddings:
             return "Unknown", 999.0
 
@@ -153,7 +154,7 @@ class RecognizerDeepFace:
     # ----------------- PROFILE LOOKUP -----------------
     def get_profile(self, name: str) -> Dict[str, Any]:
         """
-        Returns stored metadata for a person, e.g.:
-            {"age": 24}
+        Return stored metadata for a person.
+        Example: {"age": 24}
         """
         return self.person_meta.get(name, {})
