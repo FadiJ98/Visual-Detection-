@@ -242,7 +242,7 @@ def page_upload():
     with reset_col:
         st.button("Reset image", key="reset_image", on_click=reset_image)
 
-    # Upload + detect
+    # Upload widget
     img_file = st.file_uploader(
         "Choose an image",
         type=["jpg", "jpeg", "png", "bmp", "webp"],
@@ -250,11 +250,9 @@ def page_upload():
         help="Static images only (no live camera).",
     )
 
-    detect = st.button("Detect", type="primary", disabled=img_file is None)
-
-    if detect:
+    # ---------- DETECT CALLBACK ----------
+    def detect_image():
         if img_file is None:
-            st.error("Please upload an image first.")
             return
 
         file_bytes = np.frombuffer(img_file.read(), np.uint8)
@@ -329,7 +327,15 @@ def page_upload():
 
         st.session_state.annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
         st.session_state.results_table = results_table
-        go_results()  # move to results on next run
+        go_results()
+
+    # Detect button using callback
+    st.button(
+        "Detect",
+        type="primary",
+        disabled=img_file is None,
+        on_click=detect_image,
+    )
 
 
 # ---------- PAGE: RESULTS ----------
