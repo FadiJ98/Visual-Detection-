@@ -17,6 +17,37 @@ st.set_page_config(page_title="Visual Detection (DeepFace)", layout="wide")
 st.title("Visual Detection (DeepFace)")
 
 
+# ---------- WELCOME / START SCREEN ----------
+if "started" not in st.session_state:
+    st.session_state.started = False
+
+if not st.session_state.started:
+    st.markdown(
+        """
+        <div style='text-align:center; padding-top:80px;'>
+            <h1 style='font-size:48px; font-weight:700;'>
+                Welcome to Visual Detection
+            </h1>
+            <h3 style='color:#aaaaaa; margin-top:-10px;'>
+                Using DeepFace for face analysis
+            </h3>
+            <p style='font-size:20px; margin-top:30px; max-width:600px; margin-left:auto; margin-right:auto;'>
+                Press <strong>Start</strong> to upload an image and unfold true identities...
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    start = st.button("Start", type="primary")
+
+    if start:
+        st.session_state.started = True
+
+    # Stop here so the rest of the UI doesn't render until Start is pressed
+    st.stop()
+
+
 # ---------- CACHED RECOGNIZER ----------
 @st.cache_resource
 def load_recognizer() -> RecognizerDeepFace:
