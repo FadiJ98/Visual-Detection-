@@ -201,7 +201,7 @@ COLOR_PALETTE: List[tuple[str, tuple[int, int, int]]] = [
 
 
 # ---------- CACHED RECOGNIZER ----------
-@st.cache_resource
+# @st.cache_resource
 def load_recognizer() -> RecognizerDeepFace:
     return RecognizerDeepFace(model_name="Facenet512")
 

@@ -14,8 +14,10 @@ class RecognizerDeepFace:
 
     - Recursively loads all image files under `db_path`
     - Filenames are used for metadata:
+
         Tom-Cruise_63_1.jpg  ->  name = "Tom Cruise", age = 63
         mr-beast_29_3.png    ->  name = "mr beast",  age = 29
+
     - Uses DeepFace.represent(model_name=...) to compute embeddings
     - infer() finds the closest embedding and returns (name, distance)
     """
@@ -33,8 +35,8 @@ class RecognizerDeepFace:
         self.db_path.mkdir(parents=True, exist_ok=True)
 
         self.embeddings: List[np.ndarray] = []
-        self.labels: List[str] = []                     # display names
-        self.profiles: Dict[str, Dict[str, Any]] = {}   # name -> { "age": int | None }
+        self.labels: List[str] = []                   # display names
+        self.profiles: Dict[str, Dict[str, Any]] = {}  # name -> { "age": int | None }
 
         self._load_db()
 
@@ -94,7 +96,7 @@ class RecognizerDeepFace:
             self.embeddings.append(vec)
             self.labels.append(name)
 
-            # store / update profile (age)
+            # store / update simple profile (age)
             profile = self.profiles.get(name, {})
             if profile.get("age") is None and age is not None:
                 profile["age"] = age
