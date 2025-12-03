@@ -51,7 +51,6 @@ class VisualDetectionApp:
         # Redraw on resize
         self.root.bind("<Configure>", lambda _: self._redraw())
 
-        # Optional: nicer ttk theme
         try:
             ttk.Style().theme_use("clam")
         except Exception:
@@ -98,6 +97,14 @@ class VisualDetectionApp:
             state="disabled",
         )
         self.save_btn.pack(side="left", padx=5)
+
+        # NEW — Clear Button
+        self.clear_btn = ttk.Button(
+            toolbar,
+            text="Clear",
+            command=self.clear_image,
+        )
+        self.clear_btn.pack(side="left", padx=5)
 
         self.status = ttk.Label(toolbar, text="Load an image to begin.")
         self.status.pack(side="right")
@@ -160,6 +167,22 @@ class VisualDetectionApp:
         cv2.imwrite(out, self.cv_annotated)
         self.status.config(text=f"Saved: {Path(out).name}")
 
+    # ---------- NEW — CLEAR IMAGE ----------
+    def clear_image(self) -> None:
+        self.cv_bgr = None
+        self.cv_annotated = None
+        self.tk_img = None
+        self.current_path = None
+        self.last_emotions.clear()
+        self.last_names.clear()
+
+        self.detect_btn.config(state="disabled")
+        self.save_btn.config(state="disabled")
+        self.show_boxes_btn.config(state="disabled")
+
+        self.status.config(text="Image cleared.")
+        self._redraw()
+
     # ---------- DETECTION + EMOTION + RECOGNITION ----------
     def detect_faces(self) -> None:
         if self.cv_bgr is None:
@@ -173,7 +196,7 @@ class VisualDetectionApp:
                 img_path=rgb,
                 actions=["emotion"],
                 enforce_detection=True,
-                detector_backend="retinaface",  # change to "opencv" if needed
+                detector_backend="retinaface",
             )
         except Exception as e:
             messagebox.showerror("DeepFace error", str(e))
@@ -276,3 +299,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
