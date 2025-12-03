@@ -461,10 +461,17 @@ def page_loading():
                 # name from recognizer
                 name, dist = recognizer.infer(face)
 
-                # age from filename (via recognizer metadata)
-                profile = recognizer.get_profile(name)
-                age_val = profile.get("age") if profile else None
-                age_display = age_val if age_val is not None else "Unknown"
+                # age from filename (via recognizer metadata), if available
+                age_display = "Unknown"
+                if hasattr(recognizer, "get_profile") and name != "Unknown":
+                    try:
+                        profile = recognizer.get_profile(name)
+                    except Exception:
+                        profile = None
+                    if profile:
+                        age_val = profile.get("age")
+                        if age_val is not None:
+                            age_display = age_val
 
                 color_name, color_bgr = COLOR_PALETTE[(idx - 1) % len(COLOR_PALETTE)]
 
