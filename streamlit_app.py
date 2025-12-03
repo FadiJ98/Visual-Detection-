@@ -63,10 +63,39 @@ if "annotated_rgb" not in st.session_state:
     st.session_state.annotated_rgb = None
 
 
+# ---------- CALLBACK HELPERS ----------
 def reset_all():
     """Reset everything and go back to welcome."""
     st.session_state.page = "welcome"
     st.session_state.detector_backend = None
+    st.session_state.upload_key += 1
+    st.session_state.results_table = []
+    st.session_state.annotated_rgb = None
+
+
+def go_settings():
+    st.session_state.page = "settings"
+
+
+def go_upload():
+    st.session_state.page = "upload"
+
+
+def go_results():
+    st.session_state.page = "results"
+
+
+def choose_opencv():
+    st.session_state.detector_backend = "opencv"
+    st.session_state.page = "upload"
+
+
+def choose_retina():
+    st.session_state.detector_backend = "retinaface"
+    st.session_state.page = "upload"
+
+
+def reset_image():
     st.session_state.upload_key += 1
     st.session_state.results_table = []
     st.session_state.annotated_rgb = None
@@ -117,11 +146,12 @@ def page_welcome():
 
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
-        start = st.button("Start", type="primary", use_container_width=True)
-
-    if start:
-        st.session_state.page = "settings"
-        st.experimental_rerun()
+        st.button(
+            "Start",
+            type="primary",
+            use_container_width=True,
+            on_click=go_settings,
+        )
 
 
 # ---------- COMMON: TOP NAV BAR (HOME + BACK) ----------
@@ -129,19 +159,14 @@ def top_nav(show_back_to=None):
     """show_back_to: None, 'settings', or 'upload' """
     cols = st.columns([1, 1, 6])
     with cols[0]:
-        if st.button("Home", key=f"home_{st.session_state.page}"):
-            reset_all()
-            st.experimental_rerun()
+        st.button("Home", key=f"home_{st.session_state.page}", on_click=reset_all)
+
     if show_back_to == "settings":
         with cols[1]:
-            if st.button("Back to Settings"):
-                st.session_state.page = "settings"
-                st.experimental_rerun()
+            st.button("Back to Settings", on_click=go_settings)
     elif show_back_to == "upload":
         with cols[1]:
-            if st.button("Back to Image Upload"):
-                st.session_state.page = "upload"
-                st.experimental_rerun()
+            st.button("Back to Image Upload", on_click=go_upload)
 
 
 # ---------- PAGE: SETTINGS (choose detector) ----------
@@ -169,10 +194,8 @@ def page_settings():
             "</div>",
             unsafe_allow_html=True,
         )
-        if st.button("Use OpenCV", key="btn_opencv", use_container_width=True):
-            st.session_state.detector_backend = "opencv"
-            st.session_state.page = "upload"
-            st.experimental_rerun()
+        st.button("Use OpenCV", key="btn_opencv", use_container_width=True,
+                  on_click=choose_opencv)
 
     with col2:
         st.markdown(
@@ -182,10 +205,8 @@ def page_settings():
             "</div>",
             unsafe_allow_html=True,
         )
-        if st.button("Use RetinaFace", key="btn_retina", use_container_width=True):
-            st.session_state.detector_backend = "retinaface"
-            st.session_state.page = "upload"
-            st.experimental_rerun()
+        st.button("Use RetinaFace", key="btn_retina", use_container_width=True,
+                  on_click=choose_retina)
 
     if st.session_state.detector_backend:
         st.markdown(
@@ -219,11 +240,7 @@ def page_upload():
     # Reset image button
     reset_col, _ = st.columns([1, 4])
     with reset_col:
-        if st.button("Reset image", key="reset_image"):
-            st.session_state.upload_key += 1
-            st.session_state.results_table = []
-            st.session_state.annotated_rgb = None
-            st.experimental_rerun()
+        st.button("Reset image", key="reset_image", on_click=reset_image)
 
     # Upload + detect
     img_file = st.file_uploader(
@@ -312,8 +329,7 @@ def page_upload():
 
         st.session_state.annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
         st.session_state.results_table = results_table
-        st.session_state.page = "results"
-        st.experimental_rerun()
+        go_results()  # move to results on next run
 
 
 # ---------- PAGE: RESULTS ----------
