@@ -120,7 +120,6 @@ def page_welcome():
         start = st.button("Start", type="primary", use_container_width=True)
 
     if start:
-        # fade out (old page disappears) – new page will fade-in
         st.session_state.page = "settings"
 
 
@@ -131,17 +130,14 @@ def top_nav(show_back_to=None):
     with cols[0]:
         if st.button("Home", key=f"home_{st.session_state.page}"):
             reset_all()
-            st.experimental_rerun()
     if show_back_to == "settings":
         with cols[1]:
             if st.button("Back to Settings"):
                 st.session_state.page = "settings"
-                st.experimental_rerun()
     elif show_back_to == "upload":
         with cols[1]:
             if st.button("Back to Image Upload"):
                 st.session_state.page = "upload"
-                st.experimental_rerun()
 
 
 # ---------- PAGE: SETTINGS (choose detector) ----------
@@ -172,7 +168,6 @@ def page_settings():
         if st.button("Use OpenCV", key="btn_opencv", use_container_width=True):
             st.session_state.detector_backend = "opencv"
             st.session_state.page = "upload"
-            st.experimental_rerun()
 
     with col2:
         st.markdown(
@@ -185,7 +180,6 @@ def page_settings():
         if st.button("Use RetinaFace", key="btn_retina", use_container_width=True):
             st.session_state.detector_backend = "retinaface"
             st.session_state.page = "upload"
-            st.experimental_rerun()
 
     if st.session_state.detector_backend:
         st.markdown(
@@ -223,7 +217,6 @@ def page_upload():
             st.session_state.upload_key += 1
             st.session_state.results_table = []
             st.session_state.annotated_rgb = None
-            st.experimental_rerun()
 
     # Upload + detect
     img_file = st.file_uploader(
@@ -310,11 +303,9 @@ def page_upload():
                 }
             )
 
-        # Save results for results page
         st.session_state.annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
         st.session_state.results_table = results_table
         st.session_state.page = "results"
-        st.experimental_rerun()
 
 
 # ---------- PAGE: RESULTS ----------
