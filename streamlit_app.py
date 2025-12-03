@@ -448,23 +448,18 @@ def page_loading():
 
                 face = bgr[y1:y2, x1:x2]
 
-                # DeepFace attributes
                 emotion = r.get("dominant_emotion", "unknown")
 
-                # Gender may be dict like {"Man": x, "Woman": y} or a string
                 raw_gender = r.get("gender") or r.get("dominant_gender")
                 if isinstance(raw_gender, dict) and raw_gender:
                     gender = max(raw_gender, key=raw_gender.get)
                 else:
                     gender = raw_gender if raw_gender else "Unknown"
 
-                # Recognition (name only)
                 name, dist = recognizer.infer(face)
 
-                # Pick color from palette
                 color_name, color_bgr = COLOR_PALETTE[(idx - 1) % len(COLOR_PALETTE)]
 
-                # Draw only the colored rectangle (no label text)
                 cv2.rectangle(annotated, (x1, y1), (x2, y2), color_bgr, 3)
 
                 results_table.append(
