@@ -12,22 +12,16 @@ class RecognizerDeepFace:
     """
     Simple DeepFace-based face recognizer.
 
-    - Expects one image per identity inside `db_path`
-    - Uses DeepFace.represent(model_name=...) to build embeddings
+    - Loads one image per identity from `db_path`
+    - Uses DeepFace.represent(model_name=...) to compute embeddings
     - `infer()` finds the closest embedding and returns (name, distance)
     """
 
-    def __init__(
-        self,
-        model_name: str = "Facenet512",
-        db_path: str = "faces_db",
-        threshold: float = 1.0,
-    ) -> None:
+    def __init__(self, model_name: str = "Facenet512", db_path: str = "faces_db", threshold: float = 1.0) -> None:
         self.model_name = model_name
         self.db_path = Path(db_path)
         self.threshold = threshold
 
-        # Ensure DB folder exists
         self.db_path.mkdir(parents=True, exist_ok=True)
 
         self.embeddings: List[np.ndarray] = []
@@ -35,9 +29,9 @@ class RecognizerDeepFace:
 
         self._load_db()
 
-    # ----------------- LOAD DATABASE -----------------
+    # ----------------- LOAD DB -----------------
     def _load_db(self) -> None:
-        """Scan db_path, load each image, and store its embedding + label."""
+        """Load all face images in db_path and compute embeddings."""
         for file in self.db_path.iterdir():
             if file.suffix.lower() not in {".jpg", ".jpeg", ".png"}:
                 continue
@@ -53,18 +47,17 @@ class RecognizerDeepFace:
                     model_name=self.model_name,
                     enforce_detection=False,
                 )
-
                 if isinstance(rep, list):
                     rep = rep[0]
 
-                vec = np.asarray(rep["embedding"], dtype="float32")
+                vec = np.array(rep["embedding"], dtype="float32")
                 self.embeddings.append(vec)
                 self.labels.append(file.stem)
             except Exception:
-                # Ignore images that fail to embed
+                # Skip any images that cause errors
                 continue
 
-    # ----------------- EMBED SINGLE FACE -----------------
+    # ----------------- EMBED FACE -----------------
     def embed(self, face_bgr: np.ndarray) -> np.ndarray:
         """Return embedding vector for a cropped BGR face image."""
         rgb = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2RGB)
@@ -73,28 +66,21 @@ class RecognizerDeepFace:
             model_name=self.model_name,
             enforce_detection=False,
         )
-
         if isinstance(rep, list):
             rep = rep[0]
+        return np.array(rep["embedding"], dtype="float32")
 
-        return np.asarray(rep["embedding"], dtype="float32")
-
-    # ----------------- INFER NAME FROM DB -----------------
+    # ----------------- INFER NAME -----------------
     def infer(self, face_bgr: np.ndarray) -> Tuple[str, float]:
         """
-        Compare a face against all DB embeddings.
-
-        Returns:
-            (name, distance)
-
-        If DB is empty, image invalid, or distance > threshold:
-            -> ("Unknown", large_distance)
+        Compare face to DB. Returns (name, distance).
+        If no match or DB empty → ("Unknown", large_distance).
         """
         if face_bgr is None or face_bgr.size == 0:
             return "Unknown", 999.0
 
+        # No database, nothing to match
         if not self.embeddings:
-            # Nothing to match against
             return "Unknown", 999.0
 
         try:
