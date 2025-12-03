@@ -7,18 +7,14 @@ from typing import List, Dict, Any
 import cv2
 import numpy as np
 import streamlit as st
-
-import os
-os.environ["TF_USE_LEGACY_KERAS"] = "1"
-
 from deepface import DeepFace
 
 from recognition_deepface import RecognizerDeepFace
 
 
 # ---------- STREAMLIT PAGE CONFIG ----------
-st.set_page_config(page_title="Visual Detection — DeepFace Only", layout="wide")
-st.title("Visual Detection — Face Detection + Emotion + Recognition (DeepFace)")
+st.set_page_config(page_title="Visual Detection (DeepFace)", layout="wide")
+st.title("Visual Detection (DeepFace)")
 
 
 # ---------- CACHED RECOGNIZER ----------
@@ -35,21 +31,24 @@ recognizer = load_recognizer()
 st.sidebar.header("Settings")
 detector_backend = st.sidebar.selectbox(
     "Detector backend",
-    options=["retinaface", "opencv", "mtcnn"],
+    options=["retinaface", "opencv"],  # mtcnn removed
     index=0,
     help="If RetinaFace gives errors, try switching to opencv.",
 )
 
-threshold = st.sidebar.slider(
-    "Recognition distance threshold",
-    min_value=0.5,
-    max_value=1.5,
-    value=float(recognizer.threshold),
-    step=0.05,
-    help="Lower = stricter matching; higher = more forgiving.",
-)
 
-recognizer.threshold = threshold
+# ---------- HELPER: DISTANCE → RANGE ----------
+def distance_to_range(dist: float) -> str:
+    if dist < 0.35:
+        return "Very close"
+    elif dist < 0.55:
+        return "Close"
+    elif dist < 0.75:
+        return "Midrange"
+    elif dist < 1.0:
+        return "Far"
+    else:
+        return "Very far"
 
 
 # ---------- MAIN LAYOUT ----------
@@ -116,6 +115,7 @@ if img_file and run_button:
 
             # Recognition via your RecognizerDeepFace
             name, dist = recognizer.infer(face)
+            range_label = distance_to_range(float(dist))
 
             # Draw box + label
             label = emotion if name == "Unknown" else f"{name} | {emotion}"
@@ -137,7 +137,7 @@ if img_file and run_button:
                 {
                     "Face #": idx,
                     "Name": name,
-                    "Distance": round(float(dist), 3),
+                    "Range": range_label,  # Distance → Range
                     "Emotion": emotion,
                 }
             )
