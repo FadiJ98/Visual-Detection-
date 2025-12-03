@@ -20,15 +20,19 @@ class RecognizerDeepFace:
         - convert to gray
         - resize to 128x128
         - flatten to a 1D vector
+        - L2-normalize (so distances are roughly in [0, 2])
     - infer() compares the uploaded face to all DB embeddings
       using L2 distance and returns (name, distance).
+
+    Use `threshold` to decide when a match is strong enough:
+        typical good range ≈ 0.7 – 1.0
     """
 
     def __init__(
         self,
         model_name: str = "dummy",          # kept for compatibility
         db_path: str = "faces_db",
-        threshold: float = 2000.0,          # tune for “Unknown”
+        threshold: float = 0.9,             # tuned for normalized vectors
     ) -> None:
         self.db_path = Path(db_path)
         self.threshold = threshold
@@ -126,6 +130,9 @@ class RecognizerDeepFace:
         best_dist = dists[idx]
         best_name = self.labels[idx]
 
+        # debugging (optional):
+        # print("Best match:", best_name, "dist:", best_dist)
+
         if best_dist > self.threshold:
             return "Unknown", best_dist
 
@@ -135,3 +142,8 @@ class RecognizerDeepFace:
     def get_profile(self, name: str) -> Dict[str, Any]:
         """Return stored metadata for a name (currently just age)."""
         return self.profiles.get(name, {})
+
+    # ----------------- THRESHOLD TUNING (optional) -----------------
+    def set_threshold(self, value: float) -> None:
+        """Update decision threshold at runtime."""
+        self.threshold = float(value)
