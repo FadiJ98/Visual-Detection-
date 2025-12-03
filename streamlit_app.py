@@ -1,7 +1,6 @@
 # streamlit_app.py
 from __future__ import annotations
 
-from pathlib import Path
 from typing import List, Dict, Any
 
 import cv2
@@ -15,7 +14,7 @@ from recognition_deepface import RecognizerDeepFace
 # ---------- STREAMLIT PAGE CONFIG ----------
 st.set_page_config(page_title="Visual Detection (DeepFace)", layout="wide")
 
-# Global CSS for animations and intro styling
+# ---------- GLOBAL CSS (animations, dots, etc.) ----------
 st.markdown(
     """
     <style>
@@ -30,7 +29,6 @@ st.markdown(
     .fade-3       { animation-delay: 0.7s; }
     .fade-4       { animation-delay: 1.0s; }
 
-    /* Animated dots after the intro line */
     @keyframes dotsBlink {
         0%   { content: '';   }
         25%  { content: '.';  }
@@ -48,11 +46,57 @@ st.markdown(
 )
 
 
-# ---------- WELCOME / START SCREEN ----------
-if "started" not in st.session_state:
-    st.session_state.started = False
+# ---------- SESSION STATE SETUP ----------
+if "page" not in st.session_state:
+    st.session_state.page = "welcome"   # welcome, settings, upload, results
 
-if not st.session_state.started:
+if "detector_backend" not in st.session_state:
+    st.session_state.detector_backend = None
+
+if "upload_key" not in st.session_state:
+    st.session_state.upload_key = 0     # for resetting uploader
+
+if "results_table" not in st.session_state:
+    st.session_state.results_table = []
+
+if "annotated_rgb" not in st.session_state:
+    st.session_state.annotated_rgb = None
+
+
+def reset_all():
+    """Reset everything and go back to welcome."""
+    st.session_state.page = "welcome"
+    st.session_state.detector_backend = None
+    st.session_state.upload_key += 1
+    st.session_state.results_table = []
+    st.session_state.annotated_rgb = None
+
+
+# ---------- HELPER: DISTANCE → RANGE ----------
+def distance_to_range(dist: float) -> str:
+    if dist < 0.35:
+        return "Very close"
+    elif dist < 0.55:
+        return "Close"
+    elif dist < 0.75:
+        return "Midrange"
+    elif dist < 1.0:
+        return "Far"
+    else:
+        return "Very far"
+
+
+# ---------- CACHED RECOGNIZER ----------
+@st.cache_resource
+def load_recognizer() -> RecognizerDeepFace:
+    return RecognizerDeepFace(model_name="Facenet512")
+
+
+recognizer = load_recognizer()
+
+
+# ---------- PAGE: WELCOME ----------
+def page_welcome():
     st.markdown(
         """
         <div style='text-align:center; padding-top:80px;'>
@@ -71,91 +115,156 @@ if not st.session_state.started:
         unsafe_allow_html=True,
     )
 
-    # Centered Start button
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         start = st.button("Start", type="primary", use_container_width=True)
 
     if start:
-        st.session_state.started = True
-
-    st.stop()  # Stop here so the rest of the UI doesn't render yet
-
-
-# ---------- CACHED RECOGNIZER ----------
-@st.cache_resource
-def load_recognizer() -> RecognizerDeepFace:
-    # Uses your existing DeepFace-based recognizer class
-    return RecognizerDeepFace(model_name="Facenet512")
+        # fade out (old page disappears) – new page will fade-in
+        st.session_state.page = "settings"
 
 
-recognizer = load_recognizer()
+# ---------- COMMON: TOP NAV BAR (HOME + BACK) ----------
+def top_nav(show_back_to=None):
+    """show_back_to: None, 'settings', or 'upload' """
+    cols = st.columns([1, 1, 6])
+    with cols[0]:
+        if st.button("Home", key=f"home_{st.session_state.page}"):
+            reset_all()
+            st.experimental_rerun()
+    if show_back_to == "settings":
+        with cols[1]:
+            if st.button("Back to Settings"):
+                st.session_state.page = "settings"
+                st.experimental_rerun()
+    elif show_back_to == "upload":
+        with cols[1]:
+            if st.button("Back to Image Upload"):
+                st.session_state.page = "upload"
+                st.experimental_rerun()
 
 
-# ---------- SIDEBAR ----------
-st.sidebar.header("Settings")
-detector_backend = st.sidebar.selectbox(
-    "Detector backend",
-    options=["retinaface", "opencv"],  # mtcnn removed
-    index=0,
-    help="If RetinaFace gives errors, try switching to opencv.",
-)
+# ---------- PAGE: SETTINGS (choose detector) ----------
+def page_settings():
+    top_nav()  # Home only
+
+    st.markdown(
+        """
+        <div class='fade-in fade-1' style='text-align:center; padding-top:40px;'>
+            <h2>Select a detection backend</h2>
+            <p style='color:#aaaaaa; max-width:600px; margin:10px auto 30px auto;'>
+                Choose how faces are detected before emotion and identity analysis.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(
+            "<div class='fade-in fade-2' style='text-align:center;'>"
+            "<h3>OpenCV</h3>"
+            "<p style='color:#bbbbbb;'>Fast, classic Haar-based detection.</p>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button("Use OpenCV", key="btn_opencv", use_container_width=True):
+            st.session_state.detector_backend = "opencv"
+            st.session_state.page = "upload"
+            st.experimental_rerun()
+
+    with col2:
+        st.markdown(
+            "<div class='fade-in fade-3' style='text-align:center;'>"
+            "<h3>RetinaFace</h3>"
+            "<p style='color:#bbbbbb;'>More accurate modern deep-learning detector.</p>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button("Use RetinaFace", key="btn_retina", use_container_width=True):
+            st.session_state.detector_backend = "retinaface"
+            st.session_state.page = "upload"
+            st.experimental_rerun()
+
+    if st.session_state.detector_backend:
+        st.markdown(
+            f"<p style='text-align:center; margin-top:30px; color:#888;'>"
+            f"Current selection: <strong>{st.session_state.detector_backend}</strong>"
+            f"</p>",
+            unsafe_allow_html=True,
+        )
 
 
-# ---------- HELPER: DISTANCE → RANGE ----------
-def distance_to_range(dist: float) -> str:
-    if dist < 0.35:
-        return "Very close"
-    elif dist < 0.55:
-        return "Close"
-    elif dist < 0.75:
-        return "Midrange"
-    elif dist < 1.0:
-        return "Far"
-    else:
-        return "Very far"
+# ---------- PAGE: UPLOAD ----------
+def page_upload():
+    top_nav(show_back_to="settings")  # Home + Back to Settings
 
+    st.markdown(
+        """
+        <div class='fade-in fade-1' style='padding-top:20px;'>
+            <h2>Upload an image</h2>
+            <p style='color:#aaaaaa;'>
+                Choose a photo and run detection with your selected backend.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-# ---------- MAIN LAYOUT ----------
-col_left, col_right = st.columns(2)
+    if not st.session_state.detector_backend:
+        st.error("Please choose a detector on the Settings page first.")
+        return
 
-with col_left:
-    st.subheader("Upload image")
+    # Reset image button
+    reset_col, _ = st.columns([1, 4])
+    with reset_col:
+        if st.button("Reset image", key="reset_image"):
+            st.session_state.upload_key += 1
+            st.session_state.results_table = []
+            st.session_state.annotated_rgb = None
+            st.experimental_rerun()
+
+    # Upload + detect
     img_file = st.file_uploader(
         "Choose an image",
         type=["jpg", "jpeg", "png", "bmp", "webp"],
+        key=f"uploader_{st.session_state.upload_key}",
         help="Static images only (no live camera).",
     )
 
-    run_button = st.button("Detect + Analyze", disabled=img_file is None)
+    detect = st.button("Detect", type="primary", disabled=img_file is None)
 
-results_table: List[Dict[str, Any]] = []
+    if detect:
+        if img_file is None:
+            st.error("Please upload an image first.")
+            return
 
-if img_file and run_button:
-    # Read image into OpenCV BGR
-    file_bytes = np.frombuffer(img_file.read(), np.uint8)
-    bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        file_bytes = np.frombuffer(img_file.read(), np.uint8)
+        bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
-    if bgr is None:
-        st.error("Failed to read image. Try another file.")
-    else:
+        if bgr is None:
+            st.error("Failed to read image. Try another file.")
+            return
+
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
         try:
-            # DeepFace: detect faces + emotions
             result = DeepFace.analyze(
                 img_path=rgb,
                 actions=["emotion"],
                 enforce_detection=True,
-                detector_backend=detector_backend,
+                detector_backend=st.session_state.detector_backend,
             )
         except Exception as e:
             st.error(f"DeepFace error: {e}")
-            st.stop()
+            return
 
         faces = result if isinstance(result, list) else [result]
         annotated = bgr.copy()
         h, w = bgr.shape[:2]
+
+        results_table: List[Dict[str, Any]] = []
 
         for idx, r in enumerate(faces, start=1):
             region = r.get("region") or {}
@@ -172,17 +281,12 @@ if img_file and run_button:
             if x2 <= x1 or y2 <= y1:
                 continue
 
-            # Crop face
             face = bgr[y1:y2, x1:x2]
-
-            # Emotion
             emotion = r.get("dominant_emotion", "unknown")
 
-            # Recognition via your RecognizerDeepFace
             name, dist = recognizer.infer(face)
             range_label = distance_to_range(float(dist))
 
-            # Draw box + label
             label = emotion if name == "Unknown" else f"{name} | {emotion}"
             cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
             y_text = max(15, y1 - 10)
@@ -197,7 +301,6 @@ if img_file and run_button:
                 lineType=cv2.LINE_AA,
             )
 
-            # Collect row for results table
             results_table.append(
                 {
                     "Face #": idx,
@@ -207,26 +310,50 @@ if img_file and run_button:
                 }
             )
 
-        with col_left:
-            st.subheader("Annotated image")
-            st.image(
-                cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB),
-                channels="RGB",
-                use_column_width=True,
-            )
-
-        with col_right:
-            st.subheader("Analysis")
-            if results_table:
-                st.write(f"Detected **{len(results_table)}** face(s).")
-                st.dataframe(results_table, hide_index=True)
-            else:
-                st.info("No faces found.")
+        # Save results for results page
+        st.session_state.annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
+        st.session_state.results_table = results_table
+        st.session_state.page = "results"
+        st.experimental_rerun()
 
 
-elif img_file and not run_button:
-    # Show raw uploaded image before running analysis
+# ---------- PAGE: RESULTS ----------
+def page_results():
+    top_nav(show_back_to="upload")  # Home + Back to Image Upload
+
+    st.markdown(
+        """
+        <div class='fade-in fade-1' style='padding-top:20px;'>
+            <h2>Detection Results</h2>
+            <p style='color:#aaaaaa;'>
+                Review the detected faces, emotions, and identity ranges.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if st.session_state.annotated_rgb is None or not st.session_state.results_table:
+        st.info("No results to show yet. Go back to upload an image.")
+        return
+
+    col_left, col_right = st.columns(2)
+
     with col_left:
-        st.image(img_file, caption="Uploaded image", use_column_width=True)
+        st.subheader("Annotated image")
+        st.image(st.session_state.annotated_rgb, channels="RGB", use_column_width=True)
+
     with col_right:
-        st.info("Click **Detect + Analyze** to run DeepFace.")
+        st.subheader("Analysis")
+        st.dataframe(st.session_state.results_table, hide_index=True)
+
+
+# ---------- PAGE ROUTER ----------
+if st.session_state.page == "welcome":
+    page_welcome()
+elif st.session_state.page == "settings":
+    page_settings()
+elif st.session_state.page == "upload":
+    page_upload()
+elif st.session_state.page == "results":
+    page_results()
