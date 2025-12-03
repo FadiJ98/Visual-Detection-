@@ -311,7 +311,7 @@ def page_loading():
         <div style="display:flex; justify-content:center; align-items:center; height:80vh;">
           <div style="text-align:center;">
             <img src="https://miro.medium.com/v2/1*4Tr0FOsdUgkF32T3mdu6pg.gif"
-                 style="width:760px; max-width:90vw; border-radius:20px;"/>
+                 style="width:1080px; max-width:90vw; border-radius:20px;"/>
           </div>
         </div>
         """,
