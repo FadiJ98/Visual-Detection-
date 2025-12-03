@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import streamlit as st
 from deepface import DeepFace
+import random  # <-- NEW
 
 from recognition_deepface import RecognizerDeepFace
 
@@ -197,6 +198,38 @@ COLOR_PALETTE: List[tuple[str, tuple[int, int, int]]] = [
     ("Pink",       (220, 180, 250)),
     ("Silver",     (200, 200, 200)),
     ("Cyan",       (250, 220,  80)),
+]
+
+# ---------- FAKE NAMES BY GENDER (YOUR LISTS) ----------
+FEMALE_NAMES = [
+    "Sarah",
+    "Emily",
+    "Emma",
+    "Sophia",
+    "Olivia",
+    "Patricia",
+    "Stephanie",
+    "Michelle",
+    "Val",
+    "Mirna",
+    "Kaily",
+    "Mandel",
+    "Ammy",
+]
+
+MALE_NAMES = [
+    "Mike",
+    "Saher",
+    "Jake",
+    "Liam",
+    "Noah",
+    "Abdallah",
+    "Hasan",
+    "Mohamad",
+    "Kathem",
+    "Muneer",
+    "Cal",
+    "Andrew",
 ]
 
 
@@ -470,7 +503,20 @@ def page_loading() -> None:
                 else:
                     gender = raw_gender if raw_gender else "Unknown"
 
+                # Recognizer prediction
                 name, dist = recognizer.infer(face)
+
+                # ---------- FAKE NAME GENERATION WHEN UNKNOWN ----------
+                if name == "Unknown":
+                    g = str(gender).lower()
+
+                    if "woman" in g or "female" in g:
+                        name = random.choice(FEMALE_NAMES)
+                    elif "man" in g or "male" in g:
+                        name = random.choice(MALE_NAMES)
+                    else:
+                        # Fallback if gender can't be interpreted
+                        name = random.choice(FEMALE_NAMES + MALE_NAMES)
 
                 color_name, color_bgr = COLOR_PALETTE[(idx - 1) % len(COLOR_PALETTE)]
 
