@@ -74,6 +74,27 @@ def set_background(use_gif: bool) -> None:
     st.markdown(css, unsafe_allow_html=True)
 
 
+def set_black_background() -> None:
+    """Pure black background, no image (for loading + results)."""
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: #000000 !important;
+            background-image: none !important;
+        }
+        [data-testid="stHeader"] {
+            background: rgba(0,0,0,0) !important;
+        }
+        [data-testid="stToolbar"] {
+            display: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 # ---------- SESSION STATE SETUP ----------
 if "page" not in st.session_state:
     st.session_state.page = "welcome"   # welcome, settings, upload, loading, results
@@ -338,7 +359,7 @@ def page_upload():
 
 # ---------- PAGE: LOADING (GIF + ANALYSIS) ----------
 def page_loading():
-    set_background(False)  # plain dark background here
+    set_black_background()
     top_nav()  # just Home
 
     # Centered GIF (big)
@@ -465,14 +486,14 @@ def page_loading():
 
 # ---------- PAGE: RESULTS ----------
 def page_results():
-    set_background(False)  # plain dark background for results
+    set_black_background()
 
     top_nav(show_back_to="upload")  # Home + Back to Image Upload
 
     st.markdown(
         """
         <div class='fade-in fade-1' style='padding-top:20px;'>
-            <h2>Detection Results</h2>
+            <h2 style="color:#ffffff;">Detection Results</h2>
             <p style='color:#aaaaaa;'>
                 Review the detected faces, genders, emotions, and colors.
             </p>
