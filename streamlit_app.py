@@ -13,7 +13,7 @@ from recognition_deepface import RecognizerDeepFace
 # ---------- STREAMLIT PAGE CONFIG ----------
 st.set_page_config(page_title="Visual Detection (DeepFace)", layout="wide")
 
-# ---------- GLOBAL CSS (animations, dots, loader overlay) ----------
+# ---------- GLOBAL CSS (animations, dots) ----------
 st.markdown(
     """
     <style>
@@ -39,21 +39,6 @@ st.markdown(
         content: '';
         animation: dotsBlink 1.2s steps(4, end) infinite;
     }
-
-    /* Full-screen loader overlay */
-    .loader-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.85);
-        z-index: 9999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .loader-inner {
-        text-align: center;
-        animation: fadeUp 0.6s ease-out forwards;
-    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -62,7 +47,7 @@ st.markdown(
 
 # ---------- SESSION STATE SETUP ----------
 if "page" not in st.session_state:
-    st.session_state.page = "welcome"   # welcome, settings, upload, results
+    st.session_state.page = "welcome"   # welcome, settings, upload, loading, results
 
 if "detector_backend" not in st.session_state:
     st.session_state.detector_backend = None
@@ -76,6 +61,13 @@ if "results_table" not in st.session_state:
 if "annotated_rgb" not in st.session_state:
     st.session_state.annotated_rgb = None
 
+# for loading page
+if "uploaded_image_bytes" not in st.session_state:
+    st.session_state.uploaded_image_bytes = None
+
+if "pending_detection" not in st.session_state:
+    st.session_state.pending_detection = False
+
 
 # ---------- CALLBACK HELPERS ----------
 def reset_all():
@@ -85,6 +77,8 @@ def reset_all():
     st.session_state.upload_key += 1
     st.session_state.results_table = []
     st.session_state.annotated_rgb = None
+    st.session_state.uploaded_image_bytes = None
+    st.session_state.pending_detection = False
 
 
 def go_settings():
@@ -97,6 +91,10 @@ def go_upload():
 
 def go_results():
     st.session_state.page = "results"
+
+
+def go_loading():
+    st.session_state.page = "loading"
 
 
 def choose_opencv():
@@ -113,6 +111,8 @@ def reset_image():
     st.session_state.upload_key += 1
     st.session_state.results_table = []
     st.session_state.annotated_rgb = None
+    st.session_state.uploaded_image_bytes = None
+    st.session_state.pending_detection = False
 
 
 # ---------- COLOR PALETTE (name, BGR) ----------
@@ -204,7 +204,7 @@ def top_nav(show_back_to=None):
             st.button("Back to Image Upload", on_click=go_upload)
 
 
-# ---------- PAGE: SETTINGS (choose detector) ----------
+# ---------- PAGE: SETTINGS ----------
 def page_settings():
     top_nav()  # Home only
 
@@ -285,35 +285,55 @@ def page_upload():
         help="Static images only (no live camera).",
     )
 
-    # ---------- DETECT CALLBACK ----------
-    def detect_image():
+    # ---------- START DETECTION (NAVIGATE TO LOADING PAGE) ----------
+    def start_detection():
         if img_file is None:
             return
+        # store image bytes in session state for loading page
+        st.session_state.uploaded_image_bytes = img_file.getvalue()
+        st.session_state.pending_detection = True
+        go_loading()
 
-        file_bytes = np.frombuffer(img_file.read(), np.uint8)
-        bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+    # Detect button using callback
+    st.button(
+        "Detect",
+        type="primary",
+        disabled=img_file is None,
+        on_click=start_detection,
+    )
 
-        if bgr is None:
-            st.error("Failed to read image. Try another file.")
-            return
 
-        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+# ---------- PAGE: LOADING (GIF + ANALYSIS) ----------
+def page_loading():
+    top_nav()  # just Home
 
-        # Loader overlay placeholder (full-screen, centered, no text)
-        loader = st.empty()
-        loader.markdown(
-            """
-            <div class="loader-overlay">
-              <div class="loader-inner">
-                <img src="https://miro.medium.com/v2/resize:fit:750/format:webp/1*YF4KdQE-RadFtNa6n66wdg.gif"
-                     style="width:380px; border-radius:20px;" />
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    # Centered GIF
+    st.markdown(
+        """
+        <div style="display:flex; justify-content:center; align-items:center; height:80vh;">
+          <div style="text-align:center;">
+            <img src="https://miro.medium.com/v2/resize:fit:750/format:webp/1*YF4KdQE-RadFtNa6n66wdg.gif"
+                 style="width:380px; border-radius:20px;"/>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
+    # Only run detection once when pending_detection is True
+    if st.session_state.pending_detection and st.session_state.uploaded_image_bytes:
         with st.spinner("Running DeepFace analysis..."):
+            img_bytes = st.session_state.uploaded_image_bytes
+            file_bytes = np.frombuffer(img_bytes, np.uint8)
+            bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
+            if bgr is None:
+                st.session_state.pending_detection = False
+                st.error("Failed to read image. Try another file.")
+                return
+
+            rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+
             try:
                 result = DeepFace.analyze(
                     img_path=rgb,
@@ -322,7 +342,7 @@ def page_upload():
                     detector_backend=st.session_state.detector_backend,
                 )
             except Exception as e:
-                loader.empty()
+                st.session_state.pending_detection = False
                 st.error(f"DeepFace error: {e}")
                 return
 
@@ -406,17 +426,10 @@ def page_upload():
             st.session_state.annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
             st.session_state.results_table = results_table
 
-        # Remove loader overlay, go to results
-        loader.empty()
-        go_results()
-
-    # Detect button using callback
-    st.button(
-        "Detect",
-        type="primary",
-        disabled=img_file is None,
-        on_click=detect_image,
-    )
+            # done
+            st.session_state.pending_detection = False
+            go_results()
+            st.experimental_rerun()
 
 
 # ---------- PAGE: RESULTS ----------
@@ -457,5 +470,7 @@ elif st.session_state.page == "settings":
     page_settings()
 elif st.session_state.page == "upload":
     page_upload()
+elif st.session_state.page == "loading":
+    page_loading()
 elif st.session_state.page == "results":
     page_results()
